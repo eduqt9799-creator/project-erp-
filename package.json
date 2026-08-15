@@ -1,0 +1,23 @@
+{
+  "name": "alexandria-multi-portal-erp",
+  "version": "1.0.0",
+  "description": "Centralized Multi-Portal ERP System with SQLite Database & Department Isolation",
+  "main": "server/index.js",
+  "scripts": {
+    "server": "node server/index.js",
+    "client": "cmd /c npm --prefix client run dev",
+    "dev": "concurrently \"npm run server\" \"npm run client\""
+  },
+  "keywords": ["erp", "academic-portal", "multi-portal", "sqlite", "express", "react"],
+  "author": "Alexandria Systems",
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "concurrently": "^10.0.5",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "sqlite3": "^6.0.1"
+  }
+}

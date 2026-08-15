@@ -1,0 +1,288 @@
+import React, { useState } from 'react';
+import { BookOpen, Calendar, Clock, Award, FileText, CheckCircle, Send, Users, AlertCircle } from 'lucide-react';
+
+export default function StudentPortal({ stats, user, activeTab }) {
+  const [selectedAssignment, setSelectedAssignment] = useState(null);
+  const [submissionText, setSubmissionText] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitMsg, setSubmitMsg] = useState('');
+
+  if (!stats) return <div style={{ color: '#aaa', padding: '40px' }}>Loading CSE Student Portal Data...</div>;
+
+  const { department, enrolledCourses, hod, assignments, attendanceRecords, grades, announcements, teachersList } = stats;
+
+  const handleAssignmentSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedAssignment) return;
+    setSubmitting(true);
+
+    const token = localStorage.getItem('alexandria_token');
+    try {
+      const res = await fetch(`http://localhost:5000/api/assignments/${selectedAssignment.id}/submit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ submission_text: submissionText })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Submission failed');
+
+      setSubmitMsg('Assignment submitted successfully!');
+      setTimeout(() => {
+        setSelectedAssignment(null);
+        setSubmitMsg('');
+        setSubmissionText('');
+      }, 1500);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div>
+      {/* Welcome Banner (Matches Screenshot) */}
+      <div className="welcome-hero">
+        <div className="dept-pill">
+          🎓 {department?.code || 'CSE'} Department • Connected Portal
+        </div>
+        <h1 className="welcome-title">Welcome back, {user.name.split(' ')[0]}.</h1>
+        <p className="welcome-subtitle">
+          Here is a curated overview of your academic day in {department?.name || 'Computer Science & Engineering'}. The archives await your direction.
+        </p>
+      </div>
+
+      {/* Main Content Area based on Active Tab */}
+      {(activeTab === 'dashboard' || !activeTab) && (
+        <div className="dashboard-grid">
+          {/* Today's Schedule Card (Exact Screenshot Match) */}
+          <div className="card-white" style={{ gridColumn: 'span 8' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
+              <div>
+                <h2 className="card-white-title">Today's Schedule</h2>
+                <div className="card-white-subtitle">TUESDAY, OCTOBER 24</div>
+              </div>
+              <span className="blue-link">VIEW FULL WEEK</span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ padding: '14px', backgroundColor: '#f9f8f6', borderLeft: '4px solid #0f4c81', borderRadius: '4px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, color: '#111' }}>
+                  <span>CSE-301: Advanced Data Structures & Algorithms</span>
+                  <span style={{ fontSize: '13px', color: '#555' }}>09:00 AM - 10:30 AM</span>
+                </div>
+                <div style={{ fontSize: '13px', color: '#666', marginTop: '4px' }}>
+                  Turing Building Room 302 • Prof. Ada Lovelace
+                </div>
+              </div>
+
+              <div style={{ padding: '14px', backgroundColor: '#f9f8f6', borderLeft: '4px solid #c5a059', borderRadius: '4px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, color: '#111' }}>
+                  <span>CSE-402: Compiler Design Lab</span>
+                  <span style={{ fontSize: '13px', color: '#555' }}>01:30 PM - 03:30 PM</span>
+                </div>
+                <div style={{ fontSize: '13px', color: '#666', marginTop: '4px' }}>
+                  Systems Lab 404 • Prof. Grace Hopper
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Department HOD Card */}
+          <div className="card-white" style={{ gridColumn: 'span 4' }}>
+            <div className="card-white-subtitle" style={{ marginBottom: '8px' }}>CSE DEPARTMENT HEAD</div>
+            {hod ? (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '14px 0' }}>
+                  <img src={hod.avatar} alt={hod.name} style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }} />
+                  <div>
+                    <h3 style={{ fontFamily: 'Playfair Display, serif', fontSize: '18px', fontWeight: 700 }}>{hod.name}</h3>
+                    <p style={{ fontSize: '12px', color: '#666' }}>{hod.office_room || 'HOD Office'}</p>
+                  </div>
+                </div>
+                <p style={{ fontSize: '13px', color: '#444', lineHeight: 1.4, fontStyle: 'italic' }}>
+                  "Excellence in computing stems from foundational rigor and relentless inquiry."
+                </p>
+                <div style={{ marginTop: '16px', fontSize: '12px', color: '#0f4c81', fontWeight: 600 }}>
+                  ✉️ {hod.email}
+                </div>
+              </div>
+            ) : (
+              <p style={{ color: '#888', fontSize: '13px' }}>HOD information unavailable.</p>
+            )}
+          </div>
+
+          {/* Enrolled CSE Courses */}
+          <div className="card-white" style={{ gridColumn: 'span 6' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h2 className="card-white-title">Enrolled CSE Courses</h2>
+              <span className="card-white-subtitle">{enrolledCourses.length} ACTIVE</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {enrolledCourses.map(course => (
+                <div key={course.id} style={{ padding: '12px 14px', border: '1px solid #eae8e3', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '15px', color: '#0b2545' }}>{course.code}: {course.name}</div>
+                    <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>
+                      Faculty: {course.teacher_name || 'Prof. Ada Lovelace'} • {course.credits} Credits
+                    </div>
+                  </div>
+                  <span style={{ fontSize: '11px', background: '#eef4fb', color: '#0f4c81', padding: '4px 8px', borderRadius: '4px', fontWeight: 600 }}>
+                    {course.semester}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Active CSE Assignments */}
+          <div className="card-white" style={{ gridColumn: 'span 6' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h2 className="card-white-title">CSE Assignments</h2>
+              <span className="card-white-subtitle">DUE SOON</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {assignments.map(ass => (
+                <div key={ass.id} style={{ padding: '12px 14px', border: '1px solid #eae8e3', borderRadius: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '14px', color: '#111' }}>{ass.title}</div>
+                      <div style={{ fontSize: '12px', color: '#666' }}>{ass.course_code} • Due: {ass.due_date}</div>
+                    </div>
+                    {ass.submitted_marks !== null ? (
+                      <span style={{ fontSize: '12px', color: '#15803d', fontWeight: 700 }}>
+                        Score: {ass.submitted_marks} / {ass.max_marks}
+                      </span>
+                    ) : (
+                      <button 
+                        onClick={() => setSelectedAssignment(ass)}
+                        className="btn-primary" 
+                        style={{ padding: '6px 12px', fontSize: '12px' }}
+                      >
+                        Submit Solution
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* CSE Department Announcements */}
+          <div className="card-white" style={{ gridColumn: 'span 12' }}>
+            <h2 className="card-white-title" style={{ marginBottom: '16px' }}>CSE Department Notices & Broadcasts</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              {announcements.map(ann => (
+                <div key={ann.id} style={{ padding: '16px', backgroundColor: '#fcfbf9', border: '1px solid #e9e7e1', borderRadius: '8px' }}>
+                  <div style={{ fontSize: '11px', textTransform: 'uppercase', color: '#0f4c81', fontWeight: 700, marginBottom: '4px' }}>
+                    BROADCAST BY {ann.author_name || 'CSE HOD'}
+                  </div>
+                  <h3 style={{ fontFamily: 'Playfair Display, serif', fontSize: '17px', fontWeight: 700, marginBottom: '6px' }}>{ann.title}</h3>
+                  <p style={{ fontSize: '13px', color: '#444', lineHeight: 1.5 }}>{ann.content}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab: CSE Courses */}
+      {activeTab === 'courses' && (
+        <div className="dashboard-grid">
+          <div className="card-white" style={{ gridColumn: 'span 12' }}>
+            <h2 className="card-white-title">CSE Academic Curriculum</h2>
+            <p style={{ fontSize: '14px', color: '#666', marginBottom: '24px' }}>
+              Official courses allocated exclusively to Computer Science & Engineering students.
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              {enrolledCourses.map(course => (
+                <div key={course.id} style={{ border: '1px solid #ddd9cf', borderRadius: '8px', padding: '20px', backgroundColor: '#faf9f6' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 700, background: '#0f4c81', color: '#fff', padding: '4px 8px', borderRadius: '4px' }}>
+                      {course.code}
+                    </span>
+                    <span style={{ fontSize: '12px', color: '#777' }}>{course.credits} Credits</span>
+                  </div>
+                  <h3 style={{ fontFamily: 'Playfair Display, serif', fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>{course.name}</h3>
+                  <div style={{ fontSize: '13px', color: '#555', marginTop: '12px' }}>
+                    👤 Instructor: <strong>{course.teacher_name || 'Prof. Ada Lovelace'}</strong> ({course.teacher_email || 'ada@alexandria.edu'})
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab: CSE Faculty Directory */}
+      {activeTab === 'directory' && (
+        <div className="dashboard-grid">
+          <div className="card-white" style={{ gridColumn: 'span 12' }}>
+            <h2 className="card-white-title">CSE Department Faculty</h2>
+            <p style={{ fontSize: '14px', color: '#666', marginBottom: '24px' }}>
+              Connected Professors and HOD for Computer Science & Engineering.
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
+              {teachersList.map((t, idx) => (
+                <div key={idx} style={{ border: '1px solid #e2dfd7', borderRadius: '10px', padding: '20px', textAlign: 'center', backgroundColor: '#ffffff' }}>
+                  <img src={t.avatar} alt={t.name} style={{ width: '64px', height: '64px', borderRadius: '50%', objectFit: 'cover', margin: '0 auto 12px auto' }} />
+                  <h3 style={{ fontFamily: 'Playfair Display, serif', fontSize: '18px', fontWeight: 700 }}>{t.name}</h3>
+                  <p style={{ fontSize: '12px', color: '#0f4c81', fontWeight: 600, margin: '4px 0' }}>{t.specialization || 'Computer Science'}</p>
+                  <p style={{ fontSize: '12px', color: '#777' }}>📍 {t.office_room || 'Faculty Hall'}</p>
+                  <div style={{ marginTop: '12px', fontSize: '12px', color: '#333', background: '#f4f3ee', padding: '6px', borderRadius: '4px' }}>
+                    ✉️ {t.email}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assignment Submission Modal */}
+      {selectedAssignment && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h3 className="modal-header">{selectedAssignment.title}</h3>
+            <p style={{ fontSize: '13px', color: '#666', marginBottom: '16px' }}>{selectedAssignment.description}</p>
+            
+            {submitMsg ? (
+              <div style={{ color: '#15803d', fontWeight: 700, padding: '20px', textAlign: 'center' }}>
+                ✅ {submitMsg}
+              </div>
+            ) : (
+              <form onSubmit={handleAssignmentSubmit}>
+                <div className="form-group">
+                  <label className="form-label">Solution Submission Text / Code</label>
+                  <textarea 
+                    className="input-field" 
+                    rows="6"
+                    placeholder="Type your solution response or codebase link here..."
+                    value={submissionText}
+                    onChange={e => setSubmissionText(e.target.value)}
+                    required
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '16px' }}>
+                  <button 
+                    type="button" 
+                    onClick={() => setSelectedAssignment(null)}
+                    style={{ padding: '8px 16px', background: '#e5e3dc', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
+                  >
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn-primary" disabled={submitting}>
+                    {submitting ? 'Submitting...' : 'Submit Assignment'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
