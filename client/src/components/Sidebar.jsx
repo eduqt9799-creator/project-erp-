@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Users, BookOpen, BarChart3, Settings, LogOut, ShieldAlert, GraduationCap } from 'lucide-react';
+import { LayoutDashboard, Users, BookOpen, BarChart3, Settings, LogOut, ShieldAlert, GraduationCap, CheckSquare } from 'lucide-react';
 
 export default function Sidebar({ currentUser, activeTab, setActiveTab, onLogout }) {
   if (!currentUser) return null;
@@ -47,6 +47,13 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab, onLogout
           {currentUser.role === 'student' && (
             <>
               <div 
+                className={`nav-item ${activeTab === 'attendance' ? 'active' : ''}`}
+                onClick={() => setActiveTab('attendance')}
+              >
+                <CheckSquare />
+                <span>My Attendance</span>
+              </div>
+              <div 
                 className={`nav-item ${activeTab === 'courses' ? 'active' : ''}`}
                 onClick={() => setActiveTab('courses')}
               >
@@ -72,6 +79,13 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab, onLogout
 
           {currentUser.role === 'teacher' && (
             <>
+              <div 
+                className={`nav-item ${activeTab === 'attendance' ? 'active' : ''}`}
+                onClick={() => setActiveTab('attendance')}
+              >
+                <CheckSquare />
+                <span>Take Attendance</span>
+              </div>
               <div 
                 className={`nav-item ${activeTab === 'students' ? 'active' : ''}`}
                 onClick={() => setActiveTab('students')}
@@ -99,11 +113,18 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab, onLogout
           {currentUser.role === 'hod' && (
             <>
               <div 
-                className={`nav-item ${activeTab === 'faculty' ? 'active' : ''}`}
-                onClick={() => setActiveTab('faculty')}
+                className={`nav-item ${activeTab === 'attendance' ? 'active' : ''}`}
+                onClick={() => setActiveTab('attendance')}
+              >
+                <CheckSquare />
+                <span>Class Attendance & Alerts</span>
+              </div>
+              <div 
+                className={`nav-item ${activeTab === 'allocation' ? 'active' : ''}`}
+                onClick={() => setActiveTab('allocation')}
               >
                 <Users />
-                <span>Faculty & Staff</span>
+                <span>Subject & Faculty Allocations</span>
               </div>
               <div 
                 className={`nav-item ${activeTab === 'curriculum' ? 'active' : ''}`}
@@ -111,13 +132,6 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab, onLogout
               >
                 <BookOpen />
                 <span>Curriculum & Syllabi</span>
-              </div>
-              <div 
-                className={`nav-item ${activeTab === 'reports' ? 'active' : ''}`}
-                onClick={() => setActiveTab('reports')}
-              >
-                <BarChart3 />
-                <span>Dept Performance</span>
               </div>
             </>
           )}
@@ -139,11 +153,11 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab, onLogout
                 <span>User Management</span>
               </div>
               <div 
-                className={`nav-item ${activeTab === 'audit' ? 'active' : ''}`}
-                onClick={() => setActiveTab('audit')}
+                className={`nav-item ${activeTab === 'attendance' ? 'active' : ''}`}
+                onClick={() => setActiveTab('attendance')}
               >
-                <ShieldAlert />
-                <span>System Governance</span>
+                <CheckSquare />
+                <span>Institutional Attendance</span>
               </div>
             </>
           )}

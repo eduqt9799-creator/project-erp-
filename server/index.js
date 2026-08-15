@@ -247,6 +247,28 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
         [department_id]
       );
 
+      // Department Student Attendance Reports
+      const attendanceSummary = await dbAll(
+        `SELECT u.id as student_id, u.name as student_name, p.roll_number,
+                COUNT(att.id) as total_classes,
+                SUM(CASE WHEN att.status = 'present' OR att.status = 'late' THEN 1 ELSE 0 END) as present_count
+         FROM users u
+         LEFT JOIN profiles p ON u.id = p.user_id
+         LEFT JOIN attendance att ON u.id = att.student_id
+         WHERE u.department_id = ? AND u.role = 'student'
+         GROUP BY u.id`,
+        [department_id]
+      );
+
+      const studentAttendanceReports = attendanceSummary.map(st => {
+        const pct = st.total_classes > 0 ? Math.round((st.present_count / st.total_classes) * 100) : 100;
+        return {
+          ...st,
+          percentage: pct,
+          is_low: pct < 75
+        };
+      });
+
       return res.json({
         role: 'hod',
         department: dept,
@@ -256,14 +278,15 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
         teachers,
         students,
         courses,
-        announcements
+        announcements,
+        studentAttendanceReports
       });
     }
 
     if (role === 'teacher') {
       // Teacher Portal (Connected to CSE Students & CSE HOD)
       const myCourses = await dbAll(
-        `SELECT * FROM courses WHERE teacher_id = ?`,
+        `SELECT * FROM courses WHERE teacher_id = ? OR teacher_id IS NULL`,
         [userId]
       );
 
@@ -289,6 +312,17 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
         [department_id]
       );
 
+      const recentAttendance = await dbAll(
+        `SELECT att.*, u.name as student_name, p.roll_number, c.name as course_name, c.code as course_code
+         FROM attendance att
+         JOIN users u ON att.student_id = u.id
+         LEFT JOIN profiles p ON u.id = p.user_id
+         JOIN courses c ON att.course_id = c.id
+         WHERE c.department_id = ?
+         ORDER BY att.date DESC`,
+        [department_id]
+      );
+
       return res.json({
         role: 'teacher',
         department: dept,
@@ -296,7 +330,8 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
         hod,
         deptStudents,
         assignments,
-        announcements
+        announcements,
+        recentAttendance
       });
     }
 
@@ -333,9 +368,28 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
       );
 
       const attendanceRecords = await dbAll(
-        `SELECT att.*, c.name as course_name FROM attendance att JOIN courses c ON att.course_id = c.id WHERE att.student_id = ?`,
+        `SELECT att.*, c.name as course_name, c.code as course_code 
+         FROM attendance att 
+         JOIN courses c ON att.course_id = c.id 
+         WHERE att.student_id = ?
+         ORDER BY att.date DESC`,
         [userId]
       );
+
+      const courseAttendanceBreakdown = await dbAll(
+        `SELECT c.id as course_id, c.code as course_code, c.name as course_name,
+                COUNT(att.id) as total_classes,
+                SUM(CASE WHEN att.status = 'present' OR att.status = 'late' THEN 1 ELSE 0 END) as present_count
+         FROM courses c
+         LEFT JOIN attendance att ON c.id = att.course_id AND att.student_id = ?
+         WHERE c.department_id = ?
+         GROUP BY c.id`,
+        [userId, department_id]
+      );
+
+      const totalClasses = attendanceRecords.length;
+      const totalPresent = attendanceRecords.filter(r => r.status === 'present' || r.status === 'late').length;
+      const overallPercentage = totalClasses > 0 ? Math.round((totalPresent / totalClasses) * 100) : 100;
 
       const grades = await dbAll(
         `SELECT g.*, c.name as course_name, c.code as course_code FROM grades g JOIN courses c ON g.course_id = c.id WHERE g.student_id = ?`,
@@ -359,6 +413,10 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
         hod,
         assignments,
         attendanceRecords,
+        courseAttendanceBreakdown,
+        overallPercentage,
+        totalClasses,
+        totalPresent,
         grades,
         announcements,
         teachersList
@@ -502,16 +560,111 @@ app.post('/api/announcements', authenticateToken, async (req, res) => {
 // 5. ATTENDANCE & USERS DIRECTORY API
 // ==========================================
 
-// Mark Attendance
+// ==========================================
+// 5. ATTENDANCE & USERS DIRECTORY API
+// ==========================================
+
+// Bulk Mark Attendance
+app.post('/api/attendance/bulk', authenticateToken, async (req, res) => {
+  const { course_id, date, records } = req.body;
+
+  if (!course_id || !date || !Array.isArray(records)) {
+    return res.status(400).json({ error: 'Please provide course_id, date, and array of records' });
+  }
+
+  try {
+    for (const item of records) {
+      await dbRun(
+        `INSERT INTO attendance (course_id, student_id, date, status) 
+         VALUES (?, ?, ?, ?) 
+         ON CONFLICT(course_id, student_id, date) DO UPDATE SET status = excluded.status`,
+        [course_id, item.student_id, date, item.status]
+      );
+    }
+    res.json({ message: `Attendance saved successfully for ${records.length} students on ${date}` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Single Mark Attendance
 app.post('/api/attendance', authenticateToken, async (req, res) => {
   const { course_id, student_id, date, status } = req.body;
 
   try {
     await dbRun(
-      `INSERT INTO attendance (course_id, student_id, date, status) VALUES (?, ?, ?, ?)`,
+      `INSERT INTO attendance (course_id, student_id, date, status) 
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(course_id, student_id, date) DO UPDATE SET status = excluded.status`,
       [course_id, student_id, date, status]
     );
     res.json({ message: 'Attendance recorded successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin User Creation (Students & Teachers)
+app.post('/api/admin/users', authenticateToken, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Only Chancellor/Admin can create system accounts' });
+  }
+
+  const { name, email, password, role, department_id, roll_number, employee_id, designation, batch_year } = req.body;
+
+  if (!name || !email || !password || !role || !department_id) {
+    return res.status(400).json({ error: 'Required fields missing' });
+  }
+
+  try {
+    const existing = await dbGet('SELECT * FROM users WHERE email = ?', [email]);
+    if (existing) {
+      return res.status(400).json({ error: 'An account with this email already exists' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(password, salt);
+    const avatar = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}`;
+
+    const result = await dbRun(
+      `INSERT INTO users (name, email, password, role, department_id, profile_completed, avatar) VALUES (?, ?, ?, ?, ?, 1, ?)`,
+      [name, email, passwordHash, role, department_id, avatar]
+    );
+
+    const userId = result.lastID;
+
+    await dbRun(
+      `INSERT INTO profiles (user_id, roll_number, employee_id, designation, batch_year) VALUES (?, ?, ?, ?, ?)`,
+      [userId, roll_number || null, employee_id || null, designation || null, batch_year || '2023 - 2027']
+    );
+
+    res.status(201).json({ message: `${role.toUpperCase()} account created successfully!`, userId });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// HOD Assign Teacher to Course
+app.post('/api/courses/assign', authenticateToken, async (req, res) => {
+  const { course_id, teacher_id } = req.body;
+  try {
+    await dbRun(`UPDATE courses SET teacher_id = ? WHERE id = ?`, [teacher_id, course_id]);
+    res.json({ message: 'Teacher assigned to course successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// HOD Enroll Student in Course
+app.post('/api/courses/:id/enroll', authenticateToken, async (req, res) => {
+  const course_id = req.params.id;
+  const { student_id } = req.body;
+  try {
+    await dbRun(
+      `INSERT INTO enrollments (course_id, student_id) VALUES (?, ?) ON CONFLICT(course_id, student_id) DO NOTHING`,
+      [course_id, student_id]
+    );
+    res.json({ message: 'Student enrolled successfully' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

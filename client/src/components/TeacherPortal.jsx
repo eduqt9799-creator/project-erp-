@@ -15,9 +15,65 @@ export default function TeacherPortal({ stats, user, activeTab }) {
   const [attendanceStatus, setAttendanceStatus] = useState('present');
   const [attMsg, setAttMsg] = useState('');
 
+  // Full Roster Attendance State
+  const [rosterAttendance, setRosterAttendance] = useState({});
+  const [bulkSaving, setBulkSaving] = useState(false);
+
   if (!stats) return <div style={{ color: '#aaa', padding: '40px' }}>Loading CSE Professor Portal...</div>;
 
-  const { department, myCourses, hod, deptStudents, assignments, announcements } = stats;
+  const { department, myCourses, hod, deptStudents, assignments, announcements, recentAttendance } = stats;
+
+  const handleToggleStatus = (studentId, status) => {
+    setRosterAttendance(prev => ({
+      ...prev,
+      [studentId]: status
+    }));
+  };
+
+  const handleMarkAll = (status) => {
+    const updated = {};
+    deptStudents.forEach(s => {
+      updated[s.id] = status;
+    });
+    setRosterAttendance(updated);
+  };
+
+  const handleSaveBulkAttendance = async (e) => {
+    e.preventDefault();
+    setBulkSaving(true);
+    const token = localStorage.getItem('alexandria_token');
+    
+    // Prepare records array
+    const records = deptStudents.map(s => ({
+      student_id: s.id,
+      status: rosterAttendance[s.id] || 'present'
+    }));
+
+    try {
+      const res = await fetch('http://localhost:5000/api/attendance/bulk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          course_id: Number(selectedCourseId || myCourses[0]?.id || 1),
+          date: attendanceDate,
+          records
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to save attendance');
+
+      setAttMsg(`✅ Attendance saved successfully for ${records.length} students on ${attendanceDate}!`);
+      setTimeout(() => setAttMsg(''), 4000);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setBulkSaving(false);
+    }
+  };
 
   const handleCreateAssignment = async (e) => {
     e.preventDefault();
@@ -225,6 +281,132 @@ export default function TeacherPortal({ stats, user, activeTab }) {
                 </button>
               </form>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dedicated Attendance Tab */}
+      {activeTab === 'attendance' && (
+        <div className="dashboard-grid">
+          <div className="card-white" style={{ gridColumn: 'span 12' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div>
+                <h2 className="card-white-title">Class Attendance Control Logger</h2>
+                <p style={{ fontSize: '13px', color: '#666' }}>Mark and update daily attendance for your assigned CSE courses & students.</p>
+              </div>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button onClick={() => handleMarkAll('present')} style={{ padding: '6px 12px', background: '#eefbe7', color: '#15803d', border: '1px solid #bbf7d0', borderRadius: '6px', fontWeight: 600, fontSize: '12px', cursor: 'pointer' }}>
+                  ✓ Mark All Present
+                </button>
+                <button onClick={() => handleMarkAll('absent')} style={{ padding: '6px 12px', background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: '6px', fontWeight: 600, fontSize: '12px', cursor: 'pointer' }}>
+                  ✗ Mark All Absent
+                </button>
+              </div>
+            </div>
+
+            {attMsg && <div style={{ color: '#15803d', fontWeight: 700, padding: '12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', marginBottom: '16px' }}>{attMsg}</div>}
+
+            <form onSubmit={handleSaveBulkAttendance}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+                <div>
+                  <label className="form-label">Select Assigned Course / Subject</label>
+                  <select className="input-field" value={selectedCourseId} onChange={e => setSelectedCourseId(e.target.value)}>
+                    {myCourses.map(c => (
+                      <option key={c.id} value={c.id}>{c.code}: {c.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="form-label">Select Attendance Date</label>
+                  <input 
+                    type="date" 
+                    className="input-field" 
+                    value={attendanceDate}
+                    onChange={e => setAttendanceDate(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Student Roster List */}
+              <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '12px' }}>Student Roster</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '24px' }}>
+                {deptStudents.map(student => {
+                  const currentStatus = rosterAttendance[student.id] || 'present';
+                  return (
+                    <div key={student.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', border: '1px solid #eae8e3', borderRadius: '8px', backgroundColor: '#faf9f6' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <img src={student.avatar} alt={student.name} style={{ width: '40px', height: '40px', borderRadius: '50%' }} />
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: '15px', color: '#111' }}>{student.name}</div>
+                          <div style={{ fontSize: '12px', color: '#666' }}>Roll Number: {student.roll_number || 'CSE-2023-042'}</div>
+                        </div>
+                      </div>
+
+                      {/* Present / Absent / Late Toggles */}
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button 
+                          type="button" 
+                          onClick={() => handleToggleStatus(student.id, 'present')}
+                          style={{
+                            padding: '6px 14px',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            border: '1px solid',
+                            cursor: 'pointer',
+                            backgroundColor: currentStatus === 'present' ? '#15803d' : '#ffffff',
+                            color: currentStatus === 'present' ? '#ffffff' : '#333333',
+                            borderColor: currentStatus === 'present' ? '#15803d' : '#ccc'
+                          }}
+                        >
+                          Present
+                        </button>
+                        <button 
+                          type="button" 
+                          onClick={() => handleToggleStatus(student.id, 'absent')}
+                          style={{
+                            padding: '6px 14px',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            border: '1px solid',
+                            cursor: 'pointer',
+                            backgroundColor: currentStatus === 'absent' ? '#b91c1c' : '#ffffff',
+                            color: currentStatus === 'absent' ? '#ffffff' : '#333333',
+                            borderColor: currentStatus === 'absent' ? '#b91c1c' : '#ccc'
+                          }}
+                        >
+                          Absent
+                        </button>
+                        <button 
+                          type="button" 
+                          onClick={() => handleToggleStatus(student.id, 'late')}
+                          style={{
+                            padding: '6px 14px',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            border: '1px solid',
+                            cursor: 'pointer',
+                            backgroundColor: currentStatus === 'late' ? '#d97706' : '#ffffff',
+                            color: currentStatus === 'late' ? '#ffffff' : '#333333',
+                            borderColor: currentStatus === 'late' ? '#d97706' : '#ccc'
+                          }}
+                        >
+                          Late
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <button type="submit" className="btn-primary" style={{ padding: '12px 24px', fontSize: '14px' }} disabled={bulkSaving}>
+                {bulkSaving ? 'Saving Attendance...' : '💾 Save Attendance'}
+              </button>
+            </form>
           </div>
         </div>
       )}

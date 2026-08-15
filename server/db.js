@@ -107,7 +107,8 @@ db.serialize(() => {
       course_id INTEGER NOT NULL,
       student_id INTEGER NOT NULL,
       date TEXT NOT NULL,
-      status TEXT CHECK(status IN ('present', 'absent', 'late'))
+      status TEXT CHECK(status IN ('present', 'absent', 'late')),
+      UNIQUE(course_id, student_id, date)
     )
   `);
 

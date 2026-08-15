@@ -4,20 +4,74 @@ import { GraduationCap, Users, Shield, PlusCircle, Building } from 'lucide-react
 export default function AdminPortal({ stats, user, activeTab }) {
   const [allUsers, setAllUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+
+  // Form states for Admin user creation
+  const [newName, setNewName] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('password123');
+  const [newRole, setNewRole] = useState('student');
+  const [newDeptId, setNewDeptId] = useState(1);
+  const [newIdentifier, setNewIdentifier] = useState('');
+  const [creatingUser, setCreatingUser] = useState(false);
+  const [userMsg, setUserMsg] = useState('');
+
+  const fetchUsers = () => {
+    setLoadingUsers(true);
+    const token = localStorage.getItem('alexandria_token');
+    fetch('http://localhost:5000/api/users', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+      .then(res => res.json())
+      .then(data => setAllUsers(data))
+      .catch(err => console.error(err))
+      .finally(() => setLoadingUsers(false));
+  };
 
   useEffect(() => {
     if (activeTab === 'users') {
-      setLoadingUsers(true);
-      const token = localStorage.getItem('alexandria_token');
-      fetch('http://localhost:5000/api/users', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-        .then(res => res.json())
-        .then(data => setAllUsers(data))
-        .catch(err => console.error(err))
-        .finally(() => setLoadingUsers(false));
+      fetchUsers();
     }
   }, [activeTab]);
+
+  const handleCreateUser = async (e) => {
+    e.preventDefault();
+    setCreatingUser(true);
+    const token = localStorage.getItem('alexandria_token');
+    try {
+      const res = await fetch('http://localhost:5000/api/admin/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: newName,
+          email: newEmail,
+          password: newPassword,
+          role: newRole,
+          department_id: Number(newDeptId),
+          roll_number: newRole === 'student' ? newIdentifier : null,
+          employee_id: newRole === 'teacher' ? newIdentifier : null
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to create user');
+
+      setUserMsg(`✅ Account created successfully for ${newName} (${newRole.toUpperCase()})!`);
+      setShowCreateModal(false);
+      setNewName('');
+      setNewEmail('');
+      setNewIdentifier('');
+      fetchUsers();
+      setTimeout(() => setUserMsg(''), 4000);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setCreatingUser(false);
+    }
+  };
 
   if (!stats) return <div style={{ color: '#aaa', padding: '40px' }}>Loading System Governance Portal...</div>;
 
@@ -92,7 +146,15 @@ export default function AdminPortal({ stats, user, activeTab }) {
         {/* Global User Management Directory */}
         {activeTab === 'users' && (
           <div className="card-white" style={{ gridColumn: 'span 12' }}>
-            <h2 className="card-white-title" style={{ marginBottom: '16px' }}>Global ERP Users Registry</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h2 className="card-white-title">Global ERP Users Registry</h2>
+              <button onClick={() => setShowCreateModal(true)} className="btn-primary" style={{ padding: '6px 14px', fontSize: '13px' }}>
+                + Create Student / Teacher Account
+              </button>
+            </div>
+
+            {userMsg && <div style={{ color: '#15803d', fontWeight: 700, padding: '12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', marginBottom: '16px' }}>{userMsg}</div>}
+
             {loadingUsers ? (
               <p style={{ color: '#666' }}>Fetching database users...</p>
             ) : (
@@ -123,7 +185,124 @@ export default function AdminPortal({ stats, user, activeTab }) {
             )}
           </div>
         )}
+
+        {/* Tab: Institutional Attendance */}
+        {activeTab === 'attendance' && (
+          <div className="card-white" style={{ gridColumn: 'span 12' }}>
+            <h2 className="card-white-title" style={{ marginBottom: '12px' }}>Institutional Attendance Governance Report</h2>
+            <p style={{ fontSize: '13px', color: '#666', marginBottom: '20px' }}>
+              System-wide oversight across all departments (CSE, ECE, ME, EE).
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+              {departmentsList.map(d => (
+                <div key={d.id} style={{ padding: '16px', border: '1px solid #e2dfd7', borderRadius: '8px', backgroundColor: '#faf9f6' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontWeight: 800, background: '#0d2847', color: '#fff', padding: '3px 8px', borderRadius: '4px', fontSize: '12px' }}>
+                      {d.code}
+                    </span>
+                    <span style={{ fontSize: '12px', color: '#15803d', fontWeight: 700 }}>Synced & Active</span>
+                  </div>
+                  <h3 style={{ fontSize: '16px', fontWeight: 700 }}>{d.name}</h3>
+                  <div style={{ fontSize: '12px', color: '#555', marginTop: '6px' }}>
+                    HOD: <strong>{d.hod_name || 'Assigned'}</strong> • Students: <strong>{d.student_count}</strong> • Faculty: <strong>{d.teacher_count}</strong>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Admin Create User Modal */}
+      {showCreateModal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h2 className="modal-header">Create New Student or Teacher Account</h2>
+            <form onSubmit={handleCreateUser}>
+              <div className="form-group">
+                <label className="form-label">Full Name</label>
+                <input 
+                  type="text" 
+                  className="input-field" 
+                  placeholder="e.g. Dennis Ritchie"
+                  value={newName}
+                  onChange={e => setNewName(e.target.value)}
+                  required 
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Email Address</label>
+                <input 
+                  type="email" 
+                  className="input-field" 
+                  placeholder="e.g. dennis@alexandria.edu"
+                  value={newEmail}
+                  onChange={e => setNewEmail(e.target.value)}
+                  required 
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="form-group">
+                  <label className="form-label">Account Role</label>
+                  <select className="input-field" value={newRole} onChange={e => setNewRole(e.target.value)}>
+                    <option value="student">Student</option>
+                    <option value="teacher">Teacher / Faculty</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Department</label>
+                  <select className="input-field" value={newDeptId} onChange={e => setNewDeptId(e.target.value)}>
+                    <option value={1}>Computer Science & Eng. (CSE)</option>
+                    <option value={2}>Electronics & Comm. (ECE)</option>
+                    <option value={3}>Mechanical Engineering (ME)</option>
+                    <option value={4}>Electrical Engineering (EE)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">{newRole === 'student' ? 'Roll Number' : 'Employee ID'}</label>
+                <input 
+                  type="text" 
+                  className="input-field" 
+                  placeholder={newRole === 'student' ? 'e.g. CSE-2023-099' : 'e.g. EMP-CSE-105'}
+                  value={newIdentifier}
+                  onChange={e => setNewIdentifier(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Initial Default Password</label>
+                <input 
+                  type="text" 
+                  className="input-field" 
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' }}>
+                <button 
+                  type="button" 
+                  onClick={() => setShowCreateModal(false)}
+                  style={{ padding: '8px 16px', background: '#e5e3dc', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary" disabled={creatingUser}>
+                  {creatingUser ? 'Creating...' : 'Create Account'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

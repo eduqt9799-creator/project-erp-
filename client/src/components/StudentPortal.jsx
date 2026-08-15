@@ -9,7 +9,11 @@ export default function StudentPortal({ stats, user, activeTab }) {
 
   if (!stats) return <div style={{ color: '#aaa', padding: '40px' }}>Loading CSE Student Portal Data...</div>;
 
-  const { department, enrolledCourses, hod, assignments, attendanceRecords, grades, announcements, teachersList } = stats;
+  const { 
+    department, enrolledCourses, hod, assignments, attendanceRecords, 
+    courseAttendanceBreakdown, overallPercentage, totalClasses, totalPresent, 
+    grades, announcements, teachersList 
+  } = stats;
 
   const handleAssignmentSubmit = async (e) => {
     e.preventDefault();
@@ -185,6 +189,87 @@ export default function StudentPortal({ stats, user, activeTab }) {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dedicated Attendance Tab */}
+      {activeTab === 'attendance' && (
+        <div className="dashboard-grid">
+          {/* Overall Percentage Card */}
+          <div className="card-white" style={{ gridColumn: 'span 4' }}>
+            <div className="card-white-subtitle">OVERALL ATTENDANCE</div>
+            <div style={{ fontFamily: 'Playfair Display, serif', fontSize: '42px', fontWeight: 800, color: overallPercentage < 75 ? '#b91c1c' : '#15803d', marginTop: '6px' }}>
+              {overallPercentage}%
+            </div>
+            <div style={{ margin: '10px 0', background: '#e5e3dc', borderRadius: '10px', height: '8px', overflow: 'hidden' }}>
+              <div style={{ width: `${overallPercentage}%`, background: overallPercentage < 75 ? '#b91c1c' : '#15803d', height: '100%' }}></div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#666' }}>
+              <span>Attended: <strong>{totalPresent}</strong> / {totalClasses} classes</span>
+              <span style={{ fontWeight: 700, color: overallPercentage < 75 ? '#b91c1c' : '#15803d' }}>
+                {overallPercentage >= 75 ? '✓ Good Standing' : '⚠ Low Attendance Warning'}
+              </span>
+            </div>
+          </div>
+
+          {/* Subject-Wise Breakdown Card */}
+          <div className="card-white" style={{ gridColumn: 'span 8' }}>
+            <h2 className="card-white-title" style={{ marginBottom: '14px' }}>Subject Attendance Breakdown</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              {courseAttendanceBreakdown?.map((item, idx) => {
+                const pct = item.total_classes > 0 ? Math.round((item.present_count / item.total_classes) * 100) : 100;
+                return (
+                  <div key={idx} style={{ padding: '12px 14px', border: '1px solid #eae8e3', borderRadius: '8px', backgroundColor: '#faf9f6' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: '14px' }}>
+                      <span>{item.course_code}</span>
+                      <span style={{ color: pct < 75 ? '#b91c1c' : '#0f4c81' }}>{pct}%</span>
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#666', margin: '4px 0' }}>{item.course_name}</div>
+                    <div style={{ fontSize: '11px', color: '#777' }}>{item.present_count} of {item.total_classes} sessions attended</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Daily Attendance History Log */}
+          <div className="card-white" style={{ gridColumn: 'span 12' }}>
+            <h2 className="card-white-title" style={{ marginBottom: '16px' }}>Daily Attendance History Log</h2>
+            {attendanceRecords?.length === 0 ? (
+              <p style={{ color: '#777', fontSize: '13px' }}>No attendance sessions logged yet.</p>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid #ddd9cf', color: '#555' }}>
+                    <th style={{ padding: '10px' }}>Date</th>
+                    <th style={{ padding: '10px' }}>Course / Subject</th>
+                    <th style={{ padding: '10px' }}>Attendance Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {attendanceRecords?.map((rec) => (
+                    <tr key={rec.id} style={{ borderBottom: '1px solid #eae8e3' }}>
+                      <td style={{ padding: '10px', fontWeight: 600 }}>{rec.date}</td>
+                      <td style={{ padding: '10px' }}>{rec.course_code ? `${rec.course_code}: ` : ''}{rec.course_name}</td>
+                      <td style={{ padding: '10px' }}>
+                        <span style={{
+                          padding: '4px 10px',
+                          borderRadius: '4px',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          textTransform: 'uppercase',
+                          backgroundColor: rec.status === 'present' ? '#eefbe7' : rec.status === 'absent' ? '#fef2f2' : '#fef3c7',
+                          color: rec.status === 'present' ? '#15803d' : rec.status === 'absent' ? '#991b1b' : '#d97706'
+                        }}>
+                          {rec.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       )}

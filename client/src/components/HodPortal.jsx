@@ -8,9 +8,66 @@ export default function HodPortal({ stats, user, activeTab }) {
   const [targetRole, setTargetRole] = useState('all');
   const [publishing, setPublishing] = useState(false);
 
+  // Allocation state
+  const [selectedCourseForAssign, setSelectedCourseForAssign] = useState('');
+  const [selectedTeacherForAssign, setSelectedTeacherForAssign] = useState('');
+  const [selectedCourseForEnroll, setSelectedCourseForEnroll] = useState('');
+  const [selectedStudentForEnroll, setSelectedStudentForEnroll] = useState('');
+  const [allocationMsg, setAllocationMsg] = useState('');
+
   if (!stats) return <div style={{ color: '#aaa', padding: '40px' }}>Loading CSE HOD Portal...</div>;
 
-  const { department, teachersCount, studentsCount, coursesCount, teachers, students, courses, announcements } = stats;
+  const { department, teachersCount, studentsCount, coursesCount, teachers, students, courses, announcements, studentAttendanceReports } = stats;
+
+  const handleAssignTeacher = async (e) => {
+    e.preventDefault();
+    const token = localStorage.getItem('alexandria_token');
+    try {
+      const res = await fetch('http://localhost:5000/api/courses/assign', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          course_id: Number(selectedCourseForAssign || courses[0]?.id),
+          teacher_id: Number(selectedTeacherForAssign || teachers[0]?.id)
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      setAllocationMsg('✅ Teacher assigned to subject successfully!');
+      setTimeout(() => setAllocationMsg(''), 3000);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleEnrollStudent = async (e) => {
+    e.preventDefault();
+    const token = localStorage.getItem('alexandria_token');
+    const courseId = Number(selectedCourseForEnroll || courses[0]?.id);
+    try {
+      const res = await fetch(`http://localhost:5000/api/courses/${courseId}/enroll`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          student_id: Number(selectedStudentForEnroll || students[0]?.id)
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      setAllocationMsg('✅ Student enrolled into course class successfully!');
+      setTimeout(() => setAllocationMsg(''), 3000);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
 
   const handlePublishBroadcast = async (e) => {
     e.preventDefault();
@@ -189,6 +246,154 @@ export default function HodPortal({ stats, user, activeTab }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Tab: Attendance Reports & Low Attendance Alerts */}
+      {activeTab === 'attendance' && (
+        <div className="dashboard-grid">
+          {/* Low Attendance Alert Banner */}
+          <div className="card-white" style={{ gridColumn: 'span 12' }}>
+            <h2 className="card-white-title" style={{ color: '#b91c1c', marginBottom: '8px' }}>
+              ⚠️ Low Attendance Alerts (&lt; 75% Threshold)
+            </h2>
+            <p style={{ fontSize: '13px', color: '#666', marginBottom: '16px' }}>
+              Students in CSE requiring academic intervention due to attendance falling below institutional criteria.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {studentAttendanceReports?.filter(s => s.is_low).length === 0 ? (
+                <div style={{ padding: '14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', color: '#15803d', fontWeight: 600, fontSize: '13px' }}>
+                  ✓ Outstanding! No students are currently below the 75% attendance threshold.
+                </div>
+              ) : (
+                studentAttendanceReports?.filter(s => s.is_low).map(st => (
+                  <div key={st.student_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px', border: '1px solid #fecaca', backgroundColor: '#fef2f2', borderRadius: '8px' }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '15px', color: '#991b1b' }}>{st.student_name}</div>
+                      <div style={{ fontSize: '12px', color: '#7f1d1d' }}>Roll: {st.roll_number || 'CSE-2023-042'}</div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ fontSize: '18px', fontWeight: 800, color: '#991b1b' }}>{st.percentage}%</span>
+                      <div style={{ fontSize: '11px', color: '#991b1b' }}>{st.present_count} / {st.total_classes} sessions</div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* All Department Students Attendance Report */}
+          <div className="card-white" style={{ gridColumn: 'span 12' }}>
+            <h2 className="card-white-title" style={{ marginBottom: '16px' }}>Department Class Attendance Roster Report</h2>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid #ddd9cf', color: '#555' }}>
+                  <th style={{ padding: '10px' }}>Student Name</th>
+                  <th style={{ padding: '10px' }}>Roll Number</th>
+                  <th style={{ padding: '10px' }}>Attended / Total Sessions</th>
+                  <th style={{ padding: '10px' }}>Attendance Percentage</th>
+                  <th style={{ padding: '10px' }}>Standing Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {studentAttendanceReports?.map(st => (
+                  <tr key={st.student_id} style={{ borderBottom: '1px solid #eae8e3' }}>
+                    <td style={{ padding: '10px', fontWeight: 600 }}>{st.student_name}</td>
+                    <td style={{ padding: '10px', color: '#666' }}>{st.roll_number || 'CSE-2023-042'}</td>
+                    <td style={{ padding: '10px' }}>{st.present_count} / {st.total_classes}</td>
+                    <td style={{ padding: '10px', fontWeight: 700, color: st.percentage < 75 ? '#b91c1c' : '#15803d' }}>
+                      {st.percentage}%
+                    </td>
+                    <td style={{ padding: '10px' }}>
+                      <span style={{
+                        padding: '4px 10px',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        backgroundColor: st.percentage < 75 ? '#fef2f2' : '#eefbe7',
+                        color: st.percentage < 75 ? '#b91c1c' : '#15803d'
+                      }}>
+                        {st.percentage < 75 ? 'Low Attendance' : 'Good Standing'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Tab: Subject & Faculty Allocations */}
+      {activeTab === 'allocation' && (
+        <div className="dashboard-grid">
+          <div className="card-white" style={{ gridColumn: 'span 12' }}>
+            <h2 className="card-white-title">HOD Subject & Class Allocation Control</h2>
+            <p style={{ fontSize: '13px', color: '#666', marginBottom: '20px' }}>
+              Assign faculty instructors to CSE subjects and enroll students into respective classes.
+            </p>
+
+            {allocationMsg && <div style={{ color: '#15803d', fontWeight: 700, padding: '12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', marginBottom: '20px' }}>{allocationMsg}</div>}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+              {/* Form 1: Assign Teacher to Subject */}
+              <div style={{ padding: '20px', border: '1px solid #e2dfd7', borderRadius: '10px', backgroundColor: '#faf9f6' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '14px', color: '#0d2847' }}>1. Assign Teacher → Subject</h3>
+                <form onSubmit={handleAssignTeacher}>
+                  <div className="form-group">
+                    <label className="form-label">Select Course / Subject</label>
+                    <select className="input-field" value={selectedCourseForAssign} onChange={e => setSelectedCourseForAssign(e.target.value)}>
+                      {courses.map(c => (
+                        <option key={c.id} value={c.id}>{c.code}: {c.name} (Current: {c.teacher_name || 'Unassigned'})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Select Faculty Instructor</label>
+                    <select className="input-field" value={selectedTeacherForAssign} onChange={e => setSelectedTeacherForAssign(e.target.value)}>
+                      {teachers.map(t => (
+                        <option key={t.id} value={t.id}>{t.name} ({t.designation || 'Faculty'})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <button type="submit" className="btn-primary" style={{ width: '100%', marginTop: '10px' }}>
+                    Assign Faculty to Subject
+                  </button>
+                </form>
+              </div>
+
+              {/* Form 2: Enroll Student into Course / Class */}
+              <div style={{ padding: '20px', border: '1px solid #e2dfd7', borderRadius: '10px', backgroundColor: '#faf9f6' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '14px', color: '#0d2847' }}>2. Enroll Student → Course Class</h3>
+                <form onSubmit={handleEnrollStudent}>
+                  <div className="form-group">
+                    <label className="form-label">Select Course / Subject</label>
+                    <select className="input-field" value={selectedCourseForEnroll} onChange={e => setSelectedCourseForEnroll(e.target.value)}>
+                      {courses.map(c => (
+                        <option key={c.id} value={c.id}>{c.code}: {c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Select Student</label>
+                    <select className="input-field" value={selectedStudentForEnroll} onChange={e => setSelectedStudentForEnroll(e.target.value)}>
+                      {students.map(s => (
+                        <option key={s.id} value={s.id}>{s.name} ({s.roll_number || 'Roll N/A'})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <button type="submit" className="btn-primary" style={{ width: '100%', marginTop: '10px' }}>
+                    Enroll Student into Class
+                  </button>
+                </form>
+              </div>
+            </div>
           </div>
         </div>
       )}
