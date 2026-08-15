@@ -57,7 +57,7 @@ export default function AuthModal({ onLoginSuccess, onRegisterSuccess }) {
     }
   };
 
-  const loginDemo = async (demoEmail) => {
+  const loginDemo = async (demoEmail) => {   
     setEmail(demoEmail);
     setPassword('password123');
     setError('');
