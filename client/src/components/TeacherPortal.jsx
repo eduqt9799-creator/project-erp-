@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { BookOpen, Users, CheckSquare, PlusCircle, Send, Award, FileText } from 'lucide-react';
 import SettingsTab from './SettingsTab';
+import YearSelector from './YearSelector';
 
 export default function TeacherPortal({ stats, user, activeTab }) {
+  const [selectedYear, setSelectedYear] = useState(0); // 0 = All, 1 = 1st Year, 2 = 2nd Year
+
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
   const [assignmentTitle, setAssignmentTitle] = useState('');
   const [assignmentDesc, setAssignmentDesc] = useState('');
@@ -34,6 +37,17 @@ export default function TeacherPortal({ stats, user, activeTab }) {
   if (!stats) return <div style={{ color: '#aaa', padding: '40px' }}>Loading CSE Professor Portal...</div>;
 
   const { department, myCourses, hod, deptStudents, assignments, announcements, recentAttendance } = stats;
+
+  const firstYearStudents = deptStudents.filter(s => s.academic_year === 1);
+  const secondYearStudents = deptStudents.filter(s => s.academic_year === 2);
+
+  const displayedStudents = selectedYear === 0 
+    ? deptStudents 
+    : deptStudents.filter(s => s.academic_year === selectedYear);
+
+  const displayedCourses = selectedYear === 0 
+    ? myCourses 
+    : myCourses.filter(c => c.academic_year === selectedYear);
 
   const fetchSubmissionsAndGrades = async () => {
     const token = localStorage.getItem('alexandria_token');
@@ -70,7 +84,7 @@ export default function TeacherPortal({ stats, user, activeTab }) {
 
   const handleMarkAll = (status) => {
     const updated = {};
-    deptStudents.forEach(s => {
+    displayedStudents.forEach(s => {
       updated[s.id] = status;
     });
     setRosterAttendance(updated);
@@ -81,7 +95,7 @@ export default function TeacherPortal({ stats, user, activeTab }) {
     setBulkSaving(true);
     const token = localStorage.getItem('alexandria_token');
     
-    const records = deptStudents.map(s => ({
+    const records = displayedStudents.map(s => ({
       student_id: s.id,
       status: rosterAttendance[s.id] || 'present'
     }));
@@ -94,7 +108,7 @@ export default function TeacherPortal({ stats, user, activeTab }) {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          course_id: Number(selectedCourseId || myCourses[0]?.id || 1),
+          course_id: Number(selectedCourseId || displayedCourses[0]?.id || 1),
           date: attendanceDate,
           records
         })
@@ -204,7 +218,7 @@ export default function TeacherPortal({ stats, user, activeTab }) {
     }
   };
 
-  const filteredStudents = deptStudents.filter(s =>
+  const filteredStudents = displayedStudents.filter(s =>
     s.name.toLowerCase().includes(studentSearch.toLowerCase()) ||
     (s.roll_number && s.roll_number.toLowerCase().includes(studentSearch.toLowerCase()))
   );
@@ -222,6 +236,16 @@ export default function TeacherPortal({ stats, user, activeTab }) {
         </p>
       </div>
 
+      {/* Academic Year Switcher Bar (1st Year / 2nd Year / All Years) */}
+      {activeTab !== 'settings' && (
+        <YearSelector
+          selectedYear={selectedYear}
+          onSelectYear={setSelectedYear}
+          firstYearCount={firstYearStudents.length}
+          secondYearCount={secondYearStudents.length}
+        />
+      )}
+
       {/* 1. DASHBOARD HOME TAB */}
       {(activeTab === 'dashboard' || !activeTab) && (
         <div className="dashboard-grid">
@@ -229,7 +253,7 @@ export default function TeacherPortal({ stats, user, activeTab }) {
           <div className="card-white" style={{ gridColumn: 'span 8' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
               <div>
-                <h2 className="card-white-title">Today's Schedule</h2>
+                <h2 className="card-white-title">Today's Schedule ({selectedYear === 0 ? 'All Batches' : `${selectedYear}${selectedYear === 1 ? 'st' : 'nd'} Year`})</h2>
                 <div className="card-white-subtitle">TUESDAY, OCTOBER 24</div>
               </div>
               <span className="blue-link">VIEW FULL WEEK</span>
@@ -238,21 +262,21 @@ export default function TeacherPortal({ stats, user, activeTab }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div style={{ padding: '14px', backgroundColor: '#f9f8f6', borderLeft: '4px solid #0f4c81', borderRadius: '4px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, color: '#111' }}>
-                  <span>CSE-301: Advanced Data Structures & Algorithms</span>
+                  <span>CSE-101: Programming Fundamentals & Problem Solving (1st Year)</span>
                   <span style={{ fontSize: '13px', color: '#555' }}>09:00 AM - 10:30 AM</span>
                 </div>
                 <div style={{ fontSize: '13px', color: '#666', marginTop: '4px' }}>
-                  Lecture Room 302 • 42 Enrolled CSE Students
+                  Lecture Room 102 • 1st Year Batch
                 </div>
               </div>
 
               <div style={{ padding: '14px', backgroundColor: '#f9f8f6', borderLeft: '4px solid #c5a059', borderRadius: '4px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, color: '#111' }}>
-                  <span>Faculty Research & Office Hours</span>
-                  <span style={{ fontSize: '13px', color: '#555' }}>02:00 PM - 04:00 PM</span>
+                  <span>CSE-201: Advanced Data Structures (2nd Year)</span>
+                  <span style={{ fontSize: '13px', color: '#555' }}>01:30 PM - 03:30 PM</span>
                 </div>
                 <div style={{ fontSize: '13px', color: '#666', marginTop: '4px' }}>
-                  Turing Building Room 204 • Student Consultations
+                  Systems Lab 404 • 2nd Year Batch
                 </div>
               </div>
             </div>
@@ -271,7 +295,7 @@ export default function TeacherPortal({ stats, user, activeTab }) {
                   </div>
                 </div>
                 <div style={{ fontSize: '12px', color: '#444', background: '#f4f3ee', padding: '10px', borderRadius: '6px' }}>
-                  <strong>HOD Directives:</strong> Submit midterm internal assessments by Friday 5:00 PM.
+                  <strong>HOD Directives:</strong> Submit 1st Year & 2nd Year internal midterm marks by Friday.
                 </div>
               </div>
             ) : (
@@ -279,23 +303,25 @@ export default function TeacherPortal({ stats, user, activeTab }) {
             )}
           </div>
 
-          {/* Connected CSE Students */}
+          {/* Connected CSE Students (Filtered by selectedYear) */}
           <div className="card-white" style={{ gridColumn: 'span 7' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h2 className="card-white-title">CSE Department Students</h2>
-              <span className="card-white-subtitle">{deptStudents.length} ENROLLED</span>
+              <h2 className="card-white-title">CSE Department Students ({selectedYear === 0 ? 'All Batches' : `${selectedYear}${selectedYear === 1 ? 'st' : 'nd'} Year`})</h2>
+              <span className="card-white-subtitle">{displayedStudents.length} ENROLLED</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {deptStudents.map(st => (
+              {displayedStudents.map(st => (
                 <div key={st.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', border: '1px solid #eae8e3', borderRadius: '6px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <img src={st.avatar} alt={st.name} style={{ width: '36px', height: '36px', borderRadius: '50%' }} />
                     <div>
                       <div style={{ fontWeight: 700, fontSize: '14px' }}>{st.name}</div>
-                      <div style={{ fontSize: '12px', color: '#777' }}>Roll: {st.roll_number || 'CSE-2023-042'}</div>
+                      <div style={{ fontSize: '12px', color: '#777' }}>Roll: {st.roll_number}</div>
                     </div>
                   </div>
-                  <span style={{ fontSize: '12px', color: '#0f4c81', fontWeight: 600 }}>CSE Batch {st.batch_year || '2023-27'}</span>
+                  <span style={{ fontSize: '11px', background: st.academic_year === 1 ? '#eef4fb' : '#fef3c7', color: st.academic_year === 1 ? '#0f4c81' : '#b45309', padding: '4px 8px', borderRadius: '4px', fontWeight: 700 }}>
+                    {st.academic_year === 1 ? '1st Year' : '2nd Year'}
+                  </span>
                 </div>
               ))}
             </div>
@@ -309,7 +335,7 @@ export default function TeacherPortal({ stats, user, activeTab }) {
               className="btn-primary" 
               style={{ width: '100%', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
             >
-              <PlusCircle size={18} /> Publish New CSE Assignment
+              <PlusCircle size={18} /> Publish New Assignment
             </button>
 
             {/* Attendance Logger Box */}
@@ -325,8 +351,8 @@ export default function TeacherPortal({ stats, user, activeTab }) {
                     value={selectedStudentId}
                     onChange={e => setSelectedStudentId(e.target.value)}
                   >
-                    {deptStudents.map(st => (
-                      <option key={st.id} value={st.id}>{st.name} ({st.roll_number})</option>
+                    {displayedStudents.map(st => (
+                      <option key={st.id} value={st.id}>[{st.academic_year === 1 ? '1st Yr' : '2nd Yr'}] {st.name} ({st.roll_number})</option>
                     ))}
                   </select>
                 </div>
@@ -364,8 +390,8 @@ export default function TeacherPortal({ stats, user, activeTab }) {
           <div className="card-white" style={{ gridColumn: 'span 12' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <div>
-                <h2 className="card-white-title">Class Attendance Control Logger</h2>
-                <p style={{ fontSize: '13px', color: '#666' }}>Mark and update daily attendance for your assigned CSE courses & students.</p>
+                <h2 className="card-white-title">Class Attendance Control Logger ({selectedYear === 0 ? 'All Batches' : `${selectedYear}${selectedYear === 1 ? 'st' : 'nd'} Year`})</h2>
+                <p style={{ fontSize: '13px', color: '#666' }}>Mark and update daily attendance for your assigned 1st Year / 2nd Year CSE students.</p>
               </div>
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button onClick={() => handleMarkAll('present')} style={{ padding: '6px 12px', background: '#eefbe7', color: '#15803d', border: '1px solid #bbf7d0', borderRadius: '6px', fontWeight: 600, fontSize: '12px', cursor: 'pointer' }}>
@@ -384,8 +410,8 @@ export default function TeacherPortal({ stats, user, activeTab }) {
                 <div>
                   <label className="form-label">Select Assigned Course / Subject</label>
                   <select className="input-field" value={selectedCourseId} onChange={e => setSelectedCourseId(e.target.value)}>
-                    {myCourses.map(c => (
-                      <option key={c.id} value={c.id}>{c.code}: {c.name}</option>
+                    {displayedCourses.map(c => (
+                      <option key={c.id} value={c.id}>[{c.academic_year === 1 ? '1st Yr' : '2nd Yr'}] {c.code}: {c.name}</option>
                     ))}
                   </select>
                 </div>
@@ -403,9 +429,11 @@ export default function TeacherPortal({ stats, user, activeTab }) {
               </div>
 
               {/* Student Roster List */}
-              <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '12px' }}>Student Roster</h3>
+              <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '12px' }}>
+                Student Roster ({selectedYear === 0 ? 'All Batches' : `${selectedYear}${selectedYear === 1 ? 'st' : 'nd'} Year`})
+              </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '24px' }}>
-                {deptStudents.map(student => {
+                {displayedStudents.map(student => {
                   const currentStatus = rosterAttendance[student.id] || 'present';
                   return (
                     <div key={student.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', border: '1px solid #eae8e3', borderRadius: '8px', backgroundColor: '#faf9f6' }}>
@@ -413,7 +441,7 @@ export default function TeacherPortal({ stats, user, activeTab }) {
                         <img src={student.avatar} alt={student.name} style={{ width: '40px', height: '40px', borderRadius: '50%' }} />
                         <div>
                           <div style={{ fontWeight: 700, fontSize: '15px', color: '#111' }}>{student.name}</div>
-                          <div style={{ fontSize: '12px', color: '#666' }}>Roll Number: {student.roll_number || 'CSE-2023-042'}</div>
+                          <div style={{ fontSize: '12px', color: '#666' }}>Roll: {student.roll_number} • Year: {student.academic_year === 1 ? '1st Year' : '2nd Year'}</div>
                         </div>
                       </div>
 
@@ -489,8 +517,8 @@ export default function TeacherPortal({ stats, user, activeTab }) {
           <div className="card-white" style={{ gridColumn: 'span 12' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <div>
-                <h2 className="card-white-title">CSE Department Students Directory</h2>
-                <p style={{ fontSize: '13px', color: '#666' }}>Comprehensive list of students enrolled in {department?.name || 'CSE'}.</p>
+                <h2 className="card-white-title">CSE Department Students Directory ({selectedYear === 0 ? 'All Batches' : `${selectedYear}${selectedYear === 1 ? 'st' : 'nd'} Year`})</h2>
+                <p style={{ fontSize: '13px', color: '#666' }}>Comprehensive list of 1st Year & 2nd Year students in CSE.</p>
               </div>
               <input
                 type="text"
@@ -508,11 +536,11 @@ export default function TeacherPortal({ stats, user, activeTab }) {
                   <img src={s.avatar} alt={s.name} style={{ width: '54px', height: '54px', borderRadius: '50%', objectFit: 'cover' }} />
                   <div style={{ flex: 1 }}>
                     <h3 style={{ fontFamily: 'Playfair Display, serif', fontSize: '17px', fontWeight: 700 }}>{s.name}</h3>
-                    <div style={{ fontSize: '12px', color: '#0f4c81', fontWeight: 600 }}>Roll: {s.roll_number || 'N/A'}</div>
+                    <div style={{ fontSize: '12px', color: '#0f4c81', fontWeight: 600 }}>Roll: {s.roll_number}</div>
                     <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>✉️ {s.email}</div>
                   </div>
-                  <span style={{ fontSize: '11px', background: '#eef4fb', color: '#0f4c81', padding: '4px 8px', borderRadius: '4px', fontWeight: 600 }}>
-                    Batch {s.batch_year || '2023-27'}
+                  <span style={{ fontSize: '11px', background: s.academic_year === 1 ? '#eef4fb' : '#fef3c7', color: s.academic_year === 1 ? '#0f4c81' : '#b45309', padding: '4px 8px', borderRadius: '4px', fontWeight: 700 }}>
+                    {s.academic_year === 1 ? '1st Year' : '2nd Year'}
                   </span>
                 </div>
               ))}
@@ -527,8 +555,8 @@ export default function TeacherPortal({ stats, user, activeTab }) {
           <div className="card-white" style={{ gridColumn: 'span 12' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <div>
-                <h2 className="card-white-title">Academic Control — Assigned Courses</h2>
-                <p style={{ fontSize: '13px', color: '#666' }}>Syllabi and course modules instructed by you or assigned to CSE.</p>
+                <h2 className="card-white-title">Academic Control — Assigned Courses ({selectedYear === 0 ? 'All Batches' : `${selectedYear}${selectedYear === 1 ? 'st' : 'nd'} Year`})</h2>
+                <p style={{ fontSize: '13px', color: '#666' }}>1st Year and 2nd Year syllabi and course modules instructed by you or assigned to CSE.</p>
               </div>
               <button onClick={() => setShowAssignmentModal(true)} className="btn-primary" style={{ padding: '8px 16px', fontSize: '13px' }}>
                 + Publish Assignment
@@ -536,11 +564,11 @@ export default function TeacherPortal({ stats, user, activeTab }) {
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
-              {myCourses.map(course => (
+              {displayedCourses.map(course => (
                 <div key={course.id} style={{ border: '1px solid #e2dfd7', borderRadius: '10px', padding: '20px', backgroundColor: '#faf9f6' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                    <span style={{ fontSize: '12px', fontWeight: 800, background: '#0d2847', color: '#fff', padding: '4px 10px', borderRadius: '6px' }}>
-                      {course.code}
+                    <span style={{ fontSize: '12px', fontWeight: 800, background: course.academic_year === 1 ? '#0f4c81' : '#c5a059', color: '#fff', padding: '4px 10px', borderRadius: '6px' }}>
+                      {course.academic_year === 1 ? '1st Year' : '2nd Year'} • {course.code}
                     </span>
                     <span style={{ fontSize: '12px', color: '#777' }}>{course.credits} Credits • {course.semester}</span>
                   </div>
@@ -617,8 +645,8 @@ export default function TeacherPortal({ stats, user, activeTab }) {
               <div className="form-group">
                 <label className="form-label">Course</label>
                 <select className="input-field" value={selectedCourseId} onChange={e => setSelectedCourseId(e.target.value)}>
-                  {myCourses.map(c => (
-                    <option key={c.id} value={c.id}>{c.code}: {c.name}</option>
+                  {displayedCourses.map(c => (
+                    <option key={c.id} value={c.id}>[{c.academic_year === 1 ? '1st Yr' : '2nd Yr'}] {c.code}: {c.name}</option>
                   ))}
                 </select>
               </div>
@@ -628,7 +656,7 @@ export default function TeacherPortal({ stats, user, activeTab }) {
                 <input 
                   type="text" 
                   className="input-field" 
-                  placeholder="e.g. Red-Black Tree Implementation"
+                  placeholder="e.g. C Fundamentals Pointer Lab"
                   value={assignmentTitle}
                   onChange={e => setAssignmentTitle(e.target.value)}
                   required 

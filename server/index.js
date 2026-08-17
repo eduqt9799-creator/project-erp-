@@ -303,14 +303,14 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
       );
 
       const students = await dbAll(
-        `SELECT u.id, u.name, u.email, u.avatar, p.roll_number, p.batch_year
+        `SELECT u.id, u.name, u.email, u.avatar, p.roll_number, p.batch_year, COALESCE(p.academic_year, 1) as academic_year
          FROM users u LEFT JOIN profiles p ON u.id = p.user_id
          WHERE u.department_id = ? AND u.role = 'student' ORDER BY u.name ASC`,
         [department_id]
       );
 
       const courses = await dbAll(
-        `SELECT c.*, u.name as teacher_name FROM courses c LEFT JOIN users u ON c.teacher_id = u.id WHERE c.department_id = ? ORDER BY c.code ASC`,
+        `SELECT c.*, COALESCE(c.academic_year, 1) as academic_year, u.name as teacher_name FROM courses c LEFT JOIN users u ON c.teacher_id = u.id WHERE c.department_id = ? ORDER BY c.code ASC`,
         [department_id]
       );
 
@@ -320,7 +320,7 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
       );
 
       const attendanceSummary = await dbAll(
-        `SELECT u.id as student_id, u.name as student_name, p.roll_number,
+        `SELECT u.id as student_id, u.name as student_name, p.roll_number, COALESCE(p.academic_year, 1) as academic_year,
                 COUNT(att.id) as total_classes,
                 SUM(CASE WHEN att.status = 'present' OR att.status = 'late' THEN 1 ELSE 0 END) as present_count
          FROM users u
@@ -352,7 +352,7 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
 
     if (role === 'teacher') {
       const myCourses = await dbAll(
-        `SELECT c.*, d.code as dept_code FROM courses c JOIN departments d ON c.department_id = d.id WHERE c.teacher_id = ? OR c.department_id = ? ORDER BY c.code ASC`,
+        `SELECT c.*, COALESCE(c.academic_year, 1) as academic_year, d.code as dept_code FROM courses c JOIN departments d ON c.department_id = d.id WHERE c.teacher_id = ? OR c.department_id = ? ORDER BY c.code ASC`,
         [userId, department_id]
       );
 
@@ -362,7 +362,7 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
       );
 
       const deptStudents = await dbAll(
-        `SELECT u.id, u.name, u.email, u.avatar, p.roll_number, p.batch_year
+        `SELECT u.id, u.name, u.email, u.avatar, p.roll_number, p.batch_year, COALESCE(p.academic_year, 1) as academic_year
          FROM users u LEFT JOIN profiles p ON u.id = p.user_id
          WHERE u.department_id = ? AND u.role = 'student' ORDER BY u.name ASC`,
         [department_id]
@@ -876,6 +876,33 @@ app.post('/api/announcements', authenticateToken, requireRole('teacher', 'hod', 
   }
 });
 
+// Edit Announcement (HOD, Admin)
+app.put('/api/announcements/:id', authenticateToken, requireRole('hod', 'admin'), async (req, res) => {
+  const { role, department_id } = req.user;
+  const { title, content, target_role } = req.body;
+
+  if (!title || !content) {
+    return res.status(400).json({ error: 'Title and content are required' });
+  }
+
+  try {
+    const announcement = await dbGet('SELECT * FROM announcements WHERE id = ?', [req.params.id]);
+    if (!announcement) return res.status(404).json({ error: 'Announcement not found' });
+
+    if (role === 'hod' && announcement.department_id !== department_id) {
+      return res.status(403).json({ error: 'You can only edit announcements in your department' });
+    }
+
+    await dbRun(
+      `UPDATE announcements SET title = ?, content = ?, target_role = ? WHERE id = ?`,
+      [title, content, target_role || 'all', req.params.id]
+    );
+    res.json({ message: 'Announcement updated successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update announcement' });
+  }
+});
+
 // Delete Announcement (HOD, Admin — own department only for HOD)
 app.delete('/api/announcements/:id', authenticateToken, requireRole('hod', 'admin'), async (req, res) => {
   const { role, department_id } = req.user;
@@ -891,6 +918,90 @@ app.delete('/api/announcements/:id', authenticateToken, requireRole('hod', 'admi
     res.json({ message: 'Announcement deleted successfully' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete announcement' });
+  }
+});
+
+// ==========================================
+// HOD FACULTY / PROFESSOR MANAGEMENT API
+// ==========================================
+
+// HOD Add Faculty / Teacher Account
+app.post('/api/hod/teachers', authenticateToken, requireRole('hod', 'admin'), async (req, res) => {
+  const { name, email, password, employee_id, designation, specialization, office_room, phone } = req.body;
+  const deptId = req.user.department_id;
+
+  if (!name || !email || !password) {
+    return res.status(400).json({ error: 'Full name, email, and password are required' });
+  }
+
+  try {
+    const existing = await dbGet('SELECT id FROM users WHERE email = ?', [email]);
+    if (existing) {
+      return res.status(409).json({ error: 'An account with this email already exists' });
+    }
+
+    const salt = await bcrypt.genSalt(12);
+    const passwordHash = await bcrypt.hash(password, salt);
+    const avatar = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}`;
+
+    const result = await dbRun(
+      `INSERT INTO users (name, email, password, role, department_id, profile_completed, avatar) VALUES (?, ?, ?, 'teacher', ?, 1, ?)`,
+      [name, email, passwordHash, deptId, avatar]
+    );
+
+    const userId = result.lastID;
+    await dbRun(
+      `INSERT INTO profiles (user_id, employee_id, designation, specialization, office_room, phone) VALUES (?, ?, ?, ?, ?, ?)`,
+      [userId, employee_id || `EMP-CSE-${userId}`, designation || 'Associate Professor', specialization || 'Computer Science', office_room || 'Turing Hall', phone || null]
+    );
+
+    res.status(201).json({ message: `Faculty account created for ${name}!`, id: userId });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to create faculty account' });
+  }
+});
+
+// HOD Edit Faculty Details
+app.put('/api/hod/teachers/:id', authenticateToken, requireRole('hod', 'admin'), async (req, res) => {
+  const targetId = parseInt(req.params.id);
+  const deptId = req.user.department_id;
+  const { name, designation, specialization, office_room, phone } = req.body;
+
+  try {
+    const user = await dbGet('SELECT * FROM users WHERE id = ? AND department_id = ? AND role = "teacher"', [targetId, deptId]);
+    if (!user) return res.status(404).json({ error: 'Faculty member not found in your department' });
+
+    if (name && name.trim()) {
+      await dbRun('UPDATE users SET name = ? WHERE id = ?', [name.trim(), targetId]);
+    }
+
+    await dbRun(
+      `UPDATE profiles SET designation = ?, specialization = ?, office_room = ?, phone = ? WHERE user_id = ?`,
+      [designation || 'Associate Professor', specialization || 'Computer Science', office_room || 'Room 204', phone || null, targetId]
+    );
+
+    res.json({ message: 'Faculty details updated successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update faculty details' });
+  }
+});
+
+// HOD Delete Faculty Member
+app.delete('/api/hod/teachers/:id', authenticateToken, requireRole('hod', 'admin'), async (req, res) => {
+  const targetId = parseInt(req.params.id);
+  const deptId = req.user.department_id;
+
+  try {
+    const user = await dbGet('SELECT * FROM users WHERE id = ? AND department_id = ? AND role = "teacher"', [targetId, deptId]);
+    if (!user) return res.status(404).json({ error: 'Faculty member not found in your department' });
+
+    await dbRun('DELETE FROM profiles WHERE user_id = ?', [targetId]);
+    await dbRun('UPDATE courses SET teacher_id = NULL WHERE teacher_id = ?', [targetId]);
+    await dbRun('DELETE FROM users WHERE id = ?', [targetId]);
+
+    res.json({ message: `Faculty member "${user.name}" removed successfully` });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete faculty member' });
   }
 });
 
@@ -995,7 +1106,7 @@ app.get('/api/users', authenticateToken, async (req, res) => {
     if (role === 'admin') {
       users = await dbAll(
         `SELECT u.id, u.name, u.email, u.role, u.department_id, u.avatar, u.created_at, d.code as dept_code, d.name as dept_name,
-                p.roll_number, p.employee_id, p.designation, p.specialization, p.phone, p.office_room
+                p.roll_number, p.employee_id, p.designation, p.specialization, p.phone, p.office_room, COALESCE(p.academic_year, 1) as academic_year
          FROM users u
          LEFT JOIN departments d ON u.department_id = d.id
          LEFT JOIN profiles p ON u.id = p.user_id
@@ -1004,7 +1115,7 @@ app.get('/api/users', authenticateToken, async (req, res) => {
     } else {
       users = await dbAll(
         `SELECT u.id, u.name, u.email, u.role, u.department_id, u.avatar, d.code as dept_code, d.name as dept_name,
-                p.roll_number, p.employee_id, p.designation, p.specialization, p.phone, p.office_room
+                p.roll_number, p.employee_id, p.designation, p.specialization, p.phone, p.office_room, COALESCE(p.academic_year, 1) as academic_year
          FROM users u
          LEFT JOIN departments d ON u.department_id = d.id
          LEFT JOIN profiles p ON u.id = p.user_id
@@ -1021,7 +1132,7 @@ app.get('/api/users', authenticateToken, async (req, res) => {
 
 // Admin Create User
 app.post('/api/admin/users', authenticateToken, requireRole('admin'), async (req, res) => {
-  const { name, email, password, role, department_id, roll_number, employee_id, designation, batch_year } = req.body;
+  const { name, email, password, role, department_id, roll_number, employee_id, designation, batch_year, academic_year } = req.body;
 
   if (!name || !email || !password || !role || !department_id) {
     return res.status(400).json({ error: 'Required fields: name, email, password, role, department_id' });
@@ -1054,8 +1165,8 @@ app.post('/api/admin/users', authenticateToken, requireRole('admin'), async (req
     const userId = result.lastID;
 
     await dbRun(
-      `INSERT INTO profiles (user_id, roll_number, employee_id, designation, batch_year) VALUES (?, ?, ?, ?, ?)`,
-      [userId, roll_number || null, employee_id || null, designation || null, batch_year || '2023 - 2027']
+      `INSERT INTO profiles (user_id, roll_number, employee_id, designation, batch_year, academic_year) VALUES (?, ?, ?, ?, ?, ?)`,
+      [userId, roll_number || null, employee_id || null, designation || null, batch_year || (academic_year === 2 ? '2024 - 2028' : '2025 - 2029'), Number(academic_year || 1)]
     );
 
     res.status(201).json({ message: `${role.toUpperCase()} account created successfully!`, userId });

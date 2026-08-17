@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { GraduationCap, Users, Shield, PlusCircle, Building, Trash2 } from 'lucide-react';
 import SettingsTab from './SettingsTab';
+import YearSelector from './YearSelector';
 
 export default function AdminPortal({ stats, user, activeTab }) {
+  const [selectedYear, setSelectedYear] = useState(0); // 0 = All, 1 = 1st Year, 2 = 2nd Year
   const [allUsers, setAllUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -13,6 +15,7 @@ export default function AdminPortal({ stats, user, activeTab }) {
   const [newPassword, setNewPassword] = useState('password123');
   const [newRole, setNewRole] = useState('student');
   const [newDeptId, setNewDeptId] = useState(1);
+  const [newAcademicYear, setNewAcademicYear] = useState(1);
   const [newIdentifier, setNewIdentifier] = useState('');
   const [creatingUser, setCreatingUser] = useState(false);
   const [userMsg, setUserMsg] = useState('');
@@ -35,6 +38,13 @@ export default function AdminPortal({ stats, user, activeTab }) {
     }
   }, [activeTab]);
 
+  const firstYearCount = allUsers.filter(u => u.role === 'student' && u.academic_year === 1).length;
+  const secondYearCount = allUsers.filter(u => u.role === 'student' && u.academic_year === 2).length;
+
+  const displayedUsers = selectedYear === 0 
+    ? allUsers 
+    : allUsers.filter(u => u.role !== 'student' || u.academic_year === selectedYear);
+
   const handleCreateUser = async (e) => {
     e.preventDefault();
     setCreatingUser(true);
@@ -52,6 +62,7 @@ export default function AdminPortal({ stats, user, activeTab }) {
           password: newPassword,
           role: newRole,
           department_id: Number(newDeptId),
+          academic_year: Number(newAcademicYear),
           roll_number: newRole === 'student' ? newIdentifier : null,
           employee_id: newRole === 'teacher' ? newIdentifier : null
         })
@@ -110,31 +121,41 @@ export default function AdminPortal({ stats, user, activeTab }) {
         </p>
       </div>
 
+      {/* Academic Year Switcher Bar (1st Year / 2nd Year / All Years) */}
+      {activeTab !== 'settings' && (
+        <YearSelector
+          selectedYear={selectedYear}
+          onSelectYear={setSelectedYear}
+          firstYearCount={firstYearCount}
+          secondYearCount={secondYearCount}
+        />
+      )}
+
       {/* 1. DASHBOARD HOME TAB */}
       {(activeTab === 'dashboard' || !activeTab) && (
         <div className="dashboard-grid">
           <div className="card-white" style={{ gridColumn: 'span 4' }}>
-            <div className="card-white-subtitle">INSTITUTIONAL DEPARTMENTS</div>
-            <div style={{ fontFamily: 'Playfair Display, serif', fontSize: '36px', fontWeight: 700, color: '#0d2847', marginTop: '6px' }}>
-              {totalDepartments} Academic Depts
+            <div className="card-white-subtitle">FIRST YEAR ACCOUNTS</div>
+            <div style={{ fontFamily: 'Playfair Display, serif', fontSize: '36px', fontWeight: 700, color: '#0f4c81', marginTop: '6px' }}>
+              {firstYearCount} Students
             </div>
-            <p style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>CSE, ECE, ME, Electrical Engineering</p>
+            <p style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>1st Year Batch (2025 - 2029)</p>
           </div>
 
           <div className="card-white" style={{ gridColumn: 'span 4' }}>
-            <div className="card-white-subtitle">REGISTERED ERP USERS</div>
-            <div style={{ fontFamily: 'Playfair Display, serif', fontSize: '36px', fontWeight: 700, color: '#0f4c81', marginTop: '6px' }}>
+            <div className="card-white-subtitle">SECOND YEAR ACCOUNTS</div>
+            <div style={{ fontFamily: 'Playfair Display, serif', fontSize: '36px', fontWeight: 700, color: '#c5a059', marginTop: '6px' }}>
+              {secondYearCount} Students
+            </div>
+            <p style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>2nd Year Batch (2024 - 2028)</p>
+          </div>
+
+          <div className="card-white" style={{ gridColumn: 'span 4' }}>
+            <div className="card-white-subtitle">TOTAL SYSTEM ACCOUNTS</div>
+            <div style={{ fontFamily: 'Playfair Display, serif', fontSize: '36px', fontWeight: 700, color: '#15803d', marginTop: '6px' }}>
               {totalUsers} Accounts
             </div>
             <p style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>Database Authenticated Users</p>
-          </div>
-
-          <div className="card-white" style={{ gridColumn: 'span 4' }}>
-            <div className="card-white-subtitle">SYSTEM STATUS</div>
-            <div style={{ fontFamily: 'Playfair Display, serif', fontSize: '36px', fontWeight: 700, color: '#15803d', marginTop: '6px' }}>
-              Active & Synced
-            </div>
-            <p style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>SQLite Centralized Database</p>
           </div>
 
           {/* Departments Overview List */}
@@ -206,8 +227,8 @@ export default function AdminPortal({ stats, user, activeTab }) {
           <div className="card-white" style={{ gridColumn: 'span 12' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <div>
-                <h2 className="card-white-title">Global ERP Users Registry</h2>
-                <p style={{ fontSize: '13px', color: '#666' }}>System-wide user accounts across Students, Teachers, HODs, and Admins.</p>
+                <h2 className="card-white-title">Global ERP Users Registry ({selectedYear === 0 ? 'All Academic Years' : `${selectedYear}${selectedYear === 1 ? 'st' : 'nd'} Year`})</h2>
+                <p style={{ fontSize: '13px', color: '#666' }}>System-wide user accounts across 1st Year Students, 2nd Year Students, Teachers, HODs, and Admins.</p>
               </div>
               <button onClick={() => setShowCreateModal(true)} className="btn-primary" style={{ padding: '8px 16px', fontSize: '13px' }}>
                 + Create Student / Teacher Account
@@ -225,18 +246,28 @@ export default function AdminPortal({ stats, user, activeTab }) {
                     <th style={{ padding: '10px' }}>Name</th>
                     <th style={{ padding: '10px' }}>Email</th>
                     <th style={{ padding: '10px' }}>Role</th>
+                    <th style={{ padding: '10px' }}>Academic Year</th>
                     <th style={{ padding: '10px' }}>Department</th>
                     <th style={{ padding: '10px' }}>Identifier / Roll</th>
                     <th style={{ padding: '10px' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {allUsers.map(u => (
+                  {displayedUsers.map(u => (
                     <tr key={u.id} style={{ borderBottom: '1px solid #eae8e3' }}>
                       <td style={{ padding: '10px', fontWeight: 600 }}>{u.name}</td>
                       <td style={{ padding: '10px', color: '#666' }}>{u.email}</td>
                       <td style={{ padding: '10px', textTransform: 'uppercase', fontSize: '11px', fontWeight: 700, color: u.role === 'admin' ? '#a83232' : u.role === 'hod' ? '#0f4c81' : '#111' }}>
                         {u.role}
+                      </td>
+                      <td style={{ padding: '10px' }}>
+                        {u.role === 'student' ? (
+                          <span style={{ fontSize: '11px', background: u.academic_year === 1 ? '#eef4fb' : '#fef3c7', color: u.academic_year === 1 ? '#0f4c81' : '#b45309', padding: '3px 8px', borderRadius: '4px', fontWeight: 700 }}>
+                            {u.academic_year === 1 ? '1st Year' : '2nd Year'}
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: '11px', color: '#888' }}>Staff</span>
+                        )}
                       </td>
                       <td style={{ padding: '10px' }}>{u.dept_code || 'CSE'}</td>
                       <td style={{ padding: '10px', color: '#777' }}>{u.roll_number || u.employee_id || 'N/A'}</td>
@@ -323,7 +354,7 @@ export default function AdminPortal({ stats, user, activeTab }) {
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
                 <div className="form-group">
                   <label className="form-label">Account Role</label>
                   <select className="input-field" value={newRole} onChange={e => setNewRole(e.target.value)}>
@@ -332,7 +363,17 @@ export default function AdminPortal({ stats, user, activeTab }) {
                   </select>
                 </div>
 
-                <div className="form-group">
+                {newRole === 'student' && (
+                  <div className="form-group">
+                    <label className="form-label">Academic Year</label>
+                    <select className="input-field" value={newAcademicYear} onChange={e => setNewAcademicYear(e.target.value)}>
+                      <option value={1}>🥇 1st Year</option>
+                      <option value={2}>🥈 2nd Year</option>
+                    </select>
+                  </div>
+                )}
+
+                <div className="form-group" style={{ gridColumn: newRole === 'student' ? 'auto' : 'span 2' }}>
                   <label className="form-label">Department</label>
                   <select className="input-field" value={newDeptId} onChange={e => setNewDeptId(e.target.value)}>
                     <option value={1}>Computer Science & Eng. (CSE)</option>
@@ -348,7 +389,7 @@ export default function AdminPortal({ stats, user, activeTab }) {
                 <input 
                   type="text" 
                   className="input-field" 
-                  placeholder={newRole === 'student' ? 'e.g. CSE-2023-099' : 'e.g. EMP-CSE-105'}
+                  placeholder={newRole === 'student' ? 'e.g. CSE-1Y-2025-099' : 'e.g. EMP-CSE-105'}
                   value={newIdentifier}
                   onChange={e => setNewIdentifier(e.target.value)}
                   required

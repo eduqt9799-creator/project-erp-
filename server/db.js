@@ -6,7 +6,6 @@ const dbPath = path.resolve(__dirname, 'alexandria_erp.db');
 const db = new sqlite3.Database(dbPath);
 
 db.serialize(() => {
-  // Temporarily disable foreign keys during schema setup
   db.run('PRAGMA foreign_keys = OFF');
 
   // Departments Table
@@ -34,7 +33,7 @@ db.serialize(() => {
     )
   `);
 
-  // Profiles Table
+  // Profiles Table (with academic_year: 1 = 1st Year, 2 = 2nd Year)
   db.run(`
     CREATE TABLE IF NOT EXISTS profiles (
       user_id INTEGER PRIMARY KEY,
@@ -44,12 +43,13 @@ db.serialize(() => {
       roll_number TEXT,
       employee_id TEXT,
       batch_year TEXT,
+      academic_year INTEGER DEFAULT 1,
       designation TEXT,
       specialization TEXT
     )
   `);
 
-  // Courses Table
+  // Courses Table (with academic_year: 1 = 1st Year, 2 = 2nd Year)
   db.run(`
     CREATE TABLE IF NOT EXISTS courses (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -58,7 +58,8 @@ db.serialize(() => {
       department_id INTEGER NOT NULL,
       teacher_id INTEGER,
       credits INTEGER DEFAULT 3,
-      semester TEXT DEFAULT 'Fall 2026'
+      semester TEXT DEFAULT 'Fall 2026',
+      academic_year INTEGER DEFAULT 1
     )
   `);
 
@@ -133,11 +134,11 @@ db.serialize(() => {
       title TEXT NOT NULL,
       content TEXT NOT NULL,
       target_role TEXT DEFAULT 'all',
+      academic_year INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
-  // Enable foreign keys
   db.run('PRAGMA foreign_keys = ON');
 
   // Seed Default Data if Departments table is empty
@@ -148,7 +149,7 @@ db.serialize(() => {
     }
 
     if (row.count === 0) {
-      console.log("Seeding default ERP database...");
+      console.log("Seeding Alexandria ERP Database with 1st Year & 2nd Year Student Data...");
 
       // Insert Departments
       db.run(`INSERT INTO departments (id, code, name, description) VALUES 
@@ -158,7 +159,6 @@ db.serialize(() => {
         (4, 'EE', 'Electrical Engineering', 'Department of Power Systems & Energy Control')
       `);
 
-      // Password for seed users
       const salt = await bcrypt.genSalt(10);
       const defaultHash = await bcrypt.hash('password123', salt);
 
@@ -198,70 +198,94 @@ db.serialize(() => {
       db.run(`INSERT INTO profiles (user_id, phone, bio, office_room, employee_id, designation, specialization) VALUES 
         (4, '+1-555-0177', 'Professor of Systems Architecture & Compiler Design.', 'Turing Building 308', 'EMP-CSE-102', 'Assistant Professor', 'Compilers & Distributed Systems')`);
 
-      // 5. CSE Student 1 (Linus Torvalds, id: 5)
+      // =======================================================
+      // 1ST YEAR STUDENTS (academic_year = 1)
+      // =======================================================
+      // Student 5: Margaret Hamilton (1st Year)
       db.run(
         `INSERT INTO users (id, name, email, password, role, department_id, profile_completed, avatar) VALUES 
-         (5, 'Linus Torvalds', 'student.linus@alexandria.edu', ?, 'student', 1, 1, 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=200')`,
+         (5, 'Margaret Hamilton', 'student.margaret@alexandria.edu', ?, 'student', 1, 1, 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=200')`,
         [defaultHash]
       );
-      db.run(`INSERT INTO profiles (user_id, phone, bio, roll_number, batch_year) VALUES 
-        (5, '+1-555-0122', 'Final Year Computer Science & Engineering Undergraduate.', 'CSE-2023-042', '2023 - 2027')`);
+      db.run(`INSERT INTO profiles (user_id, phone, bio, roll_number, batch_year, academic_year) VALUES 
+        (5, '+1-555-0133', '1st Year CSE Undergraduate specializing in Flight Software Engineering.', 'CSE-1Y-2025-001', '2025 - 2029', 1)`);
 
-      // 6. CSE Student 2 (Margaret Hamilton, id: 6)
+      // Student 6: Dennis Ritchie (1st Year)
       db.run(
         `INSERT INTO users (id, name, email, password, role, department_id, profile_completed, avatar) VALUES 
-         (6, 'Margaret Hamilton', 'student.margaret@alexandria.edu', ?, 'student', 1, 1, 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=200')`,
+         (6, 'Dennis Ritchie', 'student.dennis@alexandria.edu', ?, 'student', 1, 1, 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=200')`,
         [defaultHash]
       );
-      db.run(`INSERT INTO profiles (user_id, phone, bio, roll_number, batch_year) VALUES 
-        (6, '+1-555-0133', 'Senior CSE Honors Student specializing in Flight Software Engineering.', 'CSE-2023-019', '2023 - 2027')`);
+      db.run(`INSERT INTO profiles (user_id, phone, bio, roll_number, batch_year, academic_year) VALUES 
+        (6, '+1-555-0155', '1st Year CSE Student interested in C programming and Unix.', 'CSE-1Y-2025-002', '2025 - 2029', 1)`);
 
-      // 7. ECE Student (Nikola Tesla, id: 7)
+      // =======================================================
+      // 2ND YEAR STUDENTS (academic_year = 2)
+      // =======================================================
+      // Student 7: Linus Torvalds (2nd Year)
       db.run(
         `INSERT INTO users (id, name, email, password, role, department_id, profile_completed, avatar) VALUES 
-         (7, 'Nikola Tesla', 'student.nikola@alexandria.edu', ?, 'student', 2, 1, 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200')`,
+         (7, 'Linus Torvalds', 'student.linus@alexandria.edu', ?, 'student', 1, 1, 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=200')`,
         [defaultHash]
       );
-      db.run(`INSERT INTO profiles (user_id, phone, bio, roll_number, batch_year) VALUES 
-        (7, '+1-555-0144', 'ECE Undergraduate researching Microelectronics.', 'ECE-2023-007', '2023 - 2027')`);
+      db.run(`INSERT INTO profiles (user_id, phone, bio, roll_number, batch_year, academic_year) VALUES 
+        (7, '+1-555-0122', '2nd Year Computer Science & Engineering Student.', 'CSE-2Y-2024-042', '2024 - 2028', 2)`);
 
-      // Seed Courses
-      db.run(`INSERT INTO courses (id, code, name, department_id, teacher_id, credits, semester) VALUES 
-        (1, 'CSE-301', 'Advanced Data Structures & Algorithms', 1, 3, 4, 'Fall 2026'),
-        (2, 'CSE-402', 'Compiler Engineering & Systems Architecture', 1, 4, 3, 'Fall 2026'),
-        (3, 'ECE-201', 'Analog Electronics & Signals', 2, NULL, 3, 'Fall 2026')
+      // Student 8: Steve Wozniak (2nd Year)
+      db.run(
+        `INSERT INTO users (id, name, email, password, role, department_id, profile_completed, avatar) VALUES 
+         (8, 'Steve Wozniak', 'student.woz@alexandria.edu', ?, 'student', 1, 1, 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200')`,
+        [defaultHash]
+      );
+      db.run(`INSERT INTO profiles (user_id, phone, bio, roll_number, batch_year, academic_year) VALUES 
+        (8, '+1-555-0166', '2nd Year CSE Hardware & Embedded Systems Enthusiast.', 'CSE-2Y-2024-008', '2024 - 2028', 2)`);
+
+      // =======================================================
+      // COURSES (Categorized by 1st Year & 2nd Year)
+      // =======================================================
+      db.run(`INSERT INTO courses (id, code, name, department_id, teacher_id, credits, semester, academic_year) VALUES 
+        (1, 'CSE-101', 'Programming Fundamentals & Problem Solving', 1, 3, 4, 'Fall 2026', 1),
+        (2, 'CSE-102', 'Discrete Mathematics & Logic', 1, 4, 3, 'Fall 2026', 1),
+        (3, 'CSE-201', 'Advanced Data Structures & Algorithms', 1, 3, 4, 'Fall 2026', 2),
+        (4, 'CSE-202', 'Compiler Engineering & Computer Systems', 1, 4, 3, 'Fall 2026', 2)
       `);
 
-      // Seed Enrollments
-      db.run(`INSERT INTO enrollments (course_id, student_id) VALUES (1, 5), (2, 5), (1, 6)`);
+      // Enrollments
+      db.run(`INSERT INTO enrollments (course_id, student_id) VALUES (1, 5), (2, 6), (3, 7), (4, 8)`);
 
-      // Seed Assignments
+      // Assignments
       db.run(`INSERT INTO assignments (id, course_id, title, description, due_date, max_marks) VALUES 
-        (1, 1, 'Red-Black Tree Implementation', 'Implement self-balancing Red-Black Search Trees with O(log n) worst-case time complexity.', '2026-10-30', 100),
-        (2, 2, 'Lexical Analyzer & AST Parser', 'Build a recursive descent parser producing an Abstract Syntax Tree in C++ / Rust.', '2026-11-15', 100)
+        (1, 1, 'C Fundamentals & Memory Pointer Lab', 'Implement dynamic memory allocation and basic linked lists in C.', '2026-10-15', 100),
+        (2, 3, 'Red-Black Tree Implementation', 'Implement self-balancing Red-Black Search Trees with O(log n) worst-case time complexity.', '2026-10-30', 100),
+        (3, 4, 'Lexical Analyzer & AST Parser', 'Build a recursive descent parser producing an Abstract Syntax Tree in C++.', '2026-11-15', 100)
       `);
 
-      // Seed Announcements
-      db.run(`INSERT INTO announcements (department_id, author_id, title, content, target_role) VALUES 
-        (1, 2, 'CSE Department Research Symposium 2026', 'All CSE undergraduates and faculty are invited to present their research projects in Turing Hall on October 24th.', 'all'),
-        (1, 3, 'CSE-301 Midterm Examination Schedule', 'The mid-term exam for Advanced Algorithms is scheduled for next Tuesday at 09:00 AM.', 'student')
+      // Announcements
+      db.run(`INSERT INTO announcements (department_id, author_id, title, content, target_role, academic_year) VALUES 
+        (1, 2, 'Welcome 1st Year CSE Students — Orientation 2026', 'All 1st Year CSE undergraduates are invited to attend the annual department induction program in Turing Auditorium.', 'all', 1),
+        (1, 2, '2nd Year Research & Project Allocations', '2nd Year students must submit their choice of faculty project advisors by Friday.', 'all', 2)
       `);
 
-      // Seed Attendance & Grades
+      // Attendance
       db.run(`INSERT INTO attendance (course_id, student_id, date, status) VALUES 
         (1, 5, '2026-10-20', 'present'),
         (1, 5, '2026-10-21', 'present'),
-        (1, 5, '2026-10-22', 'late'),
-        (1, 6, '2026-10-20', 'present'),
-        (1, 6, '2026-10-21', 'present')
+        (1, 6, '2026-10-20', 'absent'),
+        (1, 6, '2026-10-21', 'absent'),
+        (3, 7, '2026-10-20', 'present'),
+        (3, 7, '2026-10-21', 'present'),
+        (3, 8, '2026-10-20', 'late')
       `);
 
+      // Grades
       db.run(`INSERT INTO grades (student_id, course_id, grade, exam_type, score) VALUES 
-        (5, 1, 'A+', 'Midterm Assessment', 96.5),
-        (6, 1, 'A', 'Midterm Assessment', 94.0)
+        (5, 1, 'A+', 'Midterm Assessment', 98.0),
+        (6, 1, 'B', 'Midterm Assessment', 82.5),
+        (7, 3, 'A+', 'Midterm Assessment', 96.5),
+        (8, 4, 'A', 'Midterm Assessment', 94.0)
       `);
 
-      console.log("Database seeded successfully!");
+      console.log("Database seeded with 1st Year and 2nd Year student batches successfully!");
     }
   });
 });
