@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BookOpen, Users, CheckSquare, PlusCircle, Send, Award, FileText } from 'lucide-react';
+import SettingsTab from './SettingsTab';
 
 export default function TeacherPortal({ stats, user, activeTab }) {
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
@@ -19,9 +20,46 @@ export default function TeacherPortal({ stats, user, activeTab }) {
   const [rosterAttendance, setRosterAttendance] = useState({});
   const [bulkSaving, setBulkSaving] = useState(false);
 
+  // Grading tab state
+  const [submissions, setSubmissions] = useState([]);
+  const [gradesList, setGradesList] = useState([]);
+  const [gradingSubmissionId, setGradingSubmissionId] = useState(null);
+  const [gradeMarks, setGradeMarks] = useState('');
+  const [gradeFeedback, setGradeFeedback] = useState('');
+  const [gradingMsg, setGradingMsg] = useState('');
+
+  // Search state for students
+  const [studentSearch, setStudentSearch] = useState('');
+
   if (!stats) return <div style={{ color: '#aaa', padding: '40px' }}>Loading CSE Professor Portal...</div>;
 
   const { department, myCourses, hod, deptStudents, assignments, announcements, recentAttendance } = stats;
+
+  const fetchSubmissionsAndGrades = async () => {
+    const token = localStorage.getItem('alexandria_token');
+    try {
+      const [subsRes, gradesRes] = await Promise.all([
+        fetch('/api/submissions', { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch('/api/grades', { headers: { 'Authorization': `Bearer ${token}` } })
+      ]);
+      if (subsRes.ok) {
+        const subsData = await subsRes.json();
+        setSubmissions(subsData);
+      }
+      if (gradesRes.ok) {
+        const gradesData = await gradesRes.json();
+        setGradesList(gradesData);
+      }
+    } catch (err) {
+      console.error('Failed to fetch grading data:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'grading') {
+      fetchSubmissionsAndGrades();
+    }
+  }, [activeTab]);
 
   const handleToggleStatus = (studentId, status) => {
     setRosterAttendance(prev => ({
@@ -43,7 +81,6 @@ export default function TeacherPortal({ stats, user, activeTab }) {
     setBulkSaving(true);
     const token = localStorage.getItem('alexandria_token');
     
-    // Prepare records array
     const records = deptStudents.map(s => ({
       student_id: s.id,
       status: rosterAttendance[s.id] || 'present'
@@ -136,9 +173,45 @@ export default function TeacherPortal({ stats, user, activeTab }) {
     }
   };
 
+  const handleGradeSubmission = async (e) => {
+    e.preventDefault();
+    if (!gradingSubmissionId) return;
+
+    const token = localStorage.getItem('alexandria_token');
+    try {
+      const res = await fetch(`/api/submissions/${gradingSubmissionId}/grade`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          marks_obtained: Number(gradeMarks),
+          feedback: gradeFeedback
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      setGradingMsg('✅ Submission graded successfully!');
+      setGradingSubmissionId(null);
+      setGradeMarks('');
+      setGradeFeedback('');
+      fetchSubmissionsAndGrades();
+      setTimeout(() => setGradingMsg(''), 3000);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const filteredStudents = deptStudents.filter(s =>
+    s.name.toLowerCase().includes(studentSearch.toLowerCase()) ||
+    (s.roll_number && s.roll_number.toLowerCase().includes(studentSearch.toLowerCase()))
+  );
+
   return (
     <div>
-      {/* Hero Welcome (EXACT MATCH with Screenshot: "Welcome back, Professor.") */}
+      {/* Hero Welcome */}
       <div className="welcome-hero">
         <div className="dept-pill">
           👩‍🏫 {department?.code || 'CSE'} Faculty • Academic Control
@@ -149,10 +222,10 @@ export default function TeacherPortal({ stats, user, activeTab }) {
         </p>
       </div>
 
-      {/* Main Grid Views */}
+      {/* 1. DASHBOARD HOME TAB */}
       {(activeTab === 'dashboard' || !activeTab) && (
         <div className="dashboard-grid">
-          {/* Today's Schedule Card (Matches Screenshot) */}
+          {/* Today's Schedule Card */}
           <div className="card-white" style={{ gridColumn: 'span 8' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
               <div>
@@ -285,7 +358,7 @@ export default function TeacherPortal({ stats, user, activeTab }) {
         </div>
       )}
 
-      {/* Dedicated Attendance Tab */}
+      {/* 2. DEDICATED TAB: TAKE ATTENDANCE */}
       {activeTab === 'attendance' && (
         <div className="dashboard-grid">
           <div className="card-white" style={{ gridColumn: 'span 12' }}>
@@ -344,7 +417,6 @@ export default function TeacherPortal({ stats, user, activeTab }) {
                         </div>
                       </div>
 
-                      {/* Present / Absent / Late Toggles */}
                       <div style={{ display: 'flex', gap: '6px' }}>
                         <button 
                           type="button" 
@@ -411,6 +483,131 @@ export default function TeacherPortal({ stats, user, activeTab }) {
         </div>
       )}
 
+      {/* 3. DEDICATED TAB: CSE STUDENTS DIRECTORY */}
+      {activeTab === 'students' && (
+        <div className="dashboard-grid">
+          <div className="card-white" style={{ gridColumn: 'span 12' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div>
+                <h2 className="card-white-title">CSE Department Students Directory</h2>
+                <p style={{ fontSize: '13px', color: '#666' }}>Comprehensive list of students enrolled in {department?.name || 'CSE'}.</p>
+              </div>
+              <input
+                type="text"
+                className="input-field"
+                style={{ width: '260px', fontSize: '13px' }}
+                placeholder="🔍 Search student name or roll..."
+                value={studentSearch}
+                onChange={e => setStudentSearch(e.target.value)}
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+              {filteredStudents.map(s => (
+                <div key={s.id} style={{ border: '1px solid #e2dfd7', borderRadius: '10px', padding: '16px', display: 'flex', alignItems: 'center', gap: '16px', backgroundColor: '#faf9f6' }}>
+                  <img src={s.avatar} alt={s.name} style={{ width: '54px', height: '54px', borderRadius: '50%', objectFit: 'cover' }} />
+                  <div style={{ flex: 1 }}>
+                    <h3 style={{ fontFamily: 'Playfair Display, serif', fontSize: '17px', fontWeight: 700 }}>{s.name}</h3>
+                    <div style={{ fontSize: '12px', color: '#0f4c81', fontWeight: 600 }}>Roll: {s.roll_number || 'N/A'}</div>
+                    <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>✉️ {s.email}</div>
+                  </div>
+                  <span style={{ fontSize: '11px', background: '#eef4fb', color: '#0f4c81', padding: '4px 8px', borderRadius: '4px', fontWeight: 600 }}>
+                    Batch {s.batch_year || '2023-27'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. DEDICATED TAB: ACADEMIC CONTROL (COURSES) */}
+      {activeTab === 'courses' && (
+        <div className="dashboard-grid">
+          <div className="card-white" style={{ gridColumn: 'span 12' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div>
+                <h2 className="card-white-title">Academic Control — Assigned Courses</h2>
+                <p style={{ fontSize: '13px', color: '#666' }}>Syllabi and course modules instructed by you or assigned to CSE.</p>
+              </div>
+              <button onClick={() => setShowAssignmentModal(true)} className="btn-primary" style={{ padding: '8px 16px', fontSize: '13px' }}>
+                + Publish Assignment
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
+              {myCourses.map(course => (
+                <div key={course.id} style={{ border: '1px solid #e2dfd7', borderRadius: '10px', padding: '20px', backgroundColor: '#faf9f6' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 800, background: '#0d2847', color: '#fff', padding: '4px 10px', borderRadius: '6px' }}>
+                      {course.code}
+                    </span>
+                    <span style={{ fontSize: '12px', color: '#777' }}>{course.credits} Credits • {course.semester}</span>
+                  </div>
+                  <h3 style={{ fontFamily: 'Playfair Display, serif', fontSize: '20px', fontWeight: 700 }}>{course.name}</h3>
+                  <div style={{ marginTop: '14px', fontSize: '13px', color: '#555' }}>
+                    Assignments Published: <strong>{assignments.filter(a => a.course_id === course.id).length}</strong>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. DEDICATED TAB: GRADEBOOK & MARKS */}
+      {activeTab === 'grading' && (
+        <div className="dashboard-grid">
+          <div className="card-white" style={{ gridColumn: 'span 12' }}>
+            <h2 className="card-white-title">Gradebook & Student Submissions Control</h2>
+            <p style={{ fontSize: '13px', color: '#666', marginBottom: '20px' }}>
+              Review assignment solutions submitted by CSE students and award official internal assessment marks.
+            </p>
+
+            {gradingMsg && <div style={{ color: '#15803d', fontWeight: 700, padding: '12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', marginBottom: '20px' }}>{gradingMsg}</div>}
+
+            <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '12px' }}>Student Submissions awaiting evaluation</h3>
+            {submissions.length === 0 ? (
+              <p style={{ fontSize: '13px', color: '#777' }}>No student submissions recorded yet.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '30px' }}>
+                {submissions.map(sub => (
+                  <div key={sub.id} style={{ border: '1px solid #e2dfd7', borderRadius: '8px', padding: '16px', backgroundColor: '#faf9f6' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '15px', color: '#0d2847' }}>{sub.student_name} ({sub.roll_number || 'Roll N/A'})</div>
+                        <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>
+                          Assignment: <strong>{sub.assignment_title}</strong> ({sub.course_code}) • Submitted: {sub.submitted_at}
+                        </div>
+                      </div>
+                      {sub.marks_obtained !== null ? (
+                        <span style={{ fontSize: '13px', color: '#15803d', fontWeight: 700 }}>
+                          Evaluated: {sub.marks_obtained} / {sub.max_marks}
+                        </span>
+                      ) : (
+                        <button onClick={() => { setGradingSubmissionId(sub.id); setGradeMarks(sub.max_marks); }} className="btn-primary" style={{ padding: '6px 12px', fontSize: '12px' }}>
+                          Award Grade & Marks
+                        </button>
+                      )}
+                    </div>
+                    {sub.submission_text && (
+                      <div style={{ marginTop: '10px', padding: '10px', background: '#ffffff', border: '1px solid #eae8e3', borderRadius: '6px', fontSize: '13px', fontFamily: 'monospace' }}>
+                        {sub.submission_text}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 6. DEDICATED TAB: PROFILE SETTINGS */}
+      {activeTab === 'settings' && (
+        <SettingsTab user={user} />
+      )}
+
       {/* Assignment Publishing Modal */}
       {showAssignmentModal && (
         <div className="modal-overlay">
@@ -471,6 +668,52 @@ export default function TeacherPortal({ stats, user, activeTab }) {
                 </button>
                 <button type="submit" className="btn-primary" disabled={creating}>
                   {creating ? 'Publishing...' : 'Publish Assignment'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Grade Submission Modal */}
+      {gradingSubmissionId && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h2 className="modal-header">Evaluate & Grade Submission</h2>
+            <form onSubmit={handleGradeSubmission}>
+              <div className="form-group">
+                <label className="form-label">Marks Obtained</label>
+                <input
+                  type="number"
+                  className="input-field"
+                  placeholder="e.g. 95"
+                  value={gradeMarks}
+                  onChange={e => setGradeMarks(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Feedback / Comments</label>
+                <textarea
+                  className="input-field"
+                  rows="3"
+                  placeholder="Provide constructive academic feedback..."
+                  value={gradeFeedback}
+                  onChange={e => setGradeFeedback(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' }}>
+                <button
+                  type="button"
+                  onClick={() => setGradingSubmissionId(null)}
+                  style={{ padding: '8px 16px', background: '#e5e3dc', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary">
+                  Save Evaluation
                 </button>
               </div>
             </form>

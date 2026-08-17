@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { BookOpen, Calendar, Clock, Award, FileText, CheckCircle, Send, Users, AlertCircle } from 'lucide-react';
+import SettingsTab from './SettingsTab';
 
 export default function StudentPortal({ stats, user, activeTab }) {
   const [selectedAssignment, setSelectedAssignment] = useState(null);
@@ -48,7 +49,7 @@ export default function StudentPortal({ stats, user, activeTab }) {
 
   return (
     <div>
-      {/* Welcome Banner (Matches Screenshot) */}
+      {/* Welcome Banner */}
       <div className="welcome-hero">
         <div className="dept-pill">
           🎓 {department?.code || 'CSE'} Department • Connected Portal
@@ -59,10 +60,10 @@ export default function StudentPortal({ stats, user, activeTab }) {
         </p>
       </div>
 
-      {/* Main Content Area based on Active Tab */}
+      {/* 1. DASHBOARD HOME TAB */}
       {(activeTab === 'dashboard' || !activeTab) && (
         <div className="dashboard-grid">
-          {/* Today's Schedule Card (Exact Screenshot Match) */}
+          {/* Today's Schedule Card */}
           <div className="card-white" style={{ gridColumn: 'span 8' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
               <div>
@@ -193,7 +194,7 @@ export default function StudentPortal({ stats, user, activeTab }) {
         </div>
       )}
 
-      {/* Dedicated Attendance Tab */}
+      {/* 2. DEDICATED TAB: MY ATTENDANCE */}
       {activeTab === 'attendance' && (
         <div className="dashboard-grid">
           {/* Overall Percentage Card */}
@@ -274,7 +275,7 @@ export default function StudentPortal({ stats, user, activeTab }) {
         </div>
       )}
 
-      {/* Tab: CSE Courses */}
+      {/* 3. DEDICATED TAB: MY CSE COURSES */}
       {activeTab === 'courses' && (
         <div className="dashboard-grid">
           <div className="card-white" style={{ gridColumn: 'span 12' }}>
@@ -302,11 +303,11 @@ export default function StudentPortal({ stats, user, activeTab }) {
         </div>
       )}
 
-      {/* Tab: CSE Faculty Directory */}
+      {/* 4. DEDICATED TAB: FACULTY DIRECTORY */}
       {activeTab === 'directory' && (
         <div className="dashboard-grid">
           <div className="card-white" style={{ gridColumn: 'span 12' }}>
-            <h2 className="card-white-title">CSE Department Faculty</h2>
+            <h2 className="card-white-title">CSE Department Faculty Directory</h2>
             <p style={{ fontSize: '14px', color: '#666', marginBottom: '24px' }}>
               Connected Professors and HOD for Computer Science & Engineering.
             </p>
@@ -325,6 +326,61 @@ export default function StudentPortal({ stats, user, activeTab }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 5. DEDICATED TAB: GRADE TRANSCRIPT */}
+      {activeTab === 'grades' && (
+        <div className="dashboard-grid">
+          <div className="card-white" style={{ gridColumn: 'span 12' }}>
+            <h2 className="card-white-title">Official Academic Grade Transcript</h2>
+            <p style={{ fontSize: '14px', color: '#666', marginBottom: '24px' }}>
+              Verified semester grades and internal assessment evaluation record.
+            </p>
+
+            {grades.length === 0 ? (
+              <p style={{ color: '#777', fontSize: '13px' }}>No academic grades recorded for this semester yet.</p>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid #ddd9cf', color: '#555' }}>
+                    <th style={{ padding: '12px' }}>Course Code</th>
+                    <th style={{ padding: '12px' }}>Course Name</th>
+                    <th style={{ padding: '12px' }}>Assessment Type</th>
+                    <th style={{ padding: '12px' }}>Score %</th>
+                    <th style={{ padding: '12px' }}>Letter Grade</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {grades.map((g) => (
+                    <tr key={g.id} style={{ borderBottom: '1px solid #eae8e3' }}>
+                      <td style={{ padding: '12px', fontWeight: 700, color: '#0d2847' }}>{g.course_code}</td>
+                      <td style={{ padding: '12px', fontWeight: 600 }}>{g.course_name}</td>
+                      <td style={{ padding: '12px', color: '#666' }}>{g.exam_type}</td>
+                      <td style={{ padding: '12px', fontWeight: 700 }}>{g.score !== null ? `${g.score}%` : 'N/A'}</td>
+                      <td style={{ padding: '12px' }}>
+                        <span style={{
+                          padding: '4px 12px',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          fontWeight: 800,
+                          backgroundColor: '#eef4fb',
+                          color: '#0f4c81'
+                        }}>
+                          {g.grade}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 6. DEDICATED TAB: PROFILE SETTINGS */}
+      {activeTab === 'settings' && (
+        <SettingsTab user={user} />
       )}
 
       {/* Assignment Submission Modal */}

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Users, BookOpen, Megaphone, ShieldCheck, Plus, CheckCircle } from 'lucide-react';
+import { Users, BookOpen, Megaphone, Plus, Trash2, CheckCircle } from 'lucide-react';
+import SettingsTab from './SettingsTab';
 
 export default function HodPortal({ stats, user, activeTab }) {
   const [showNoticeModal, setShowNoticeModal] = useState(false);
@@ -14,6 +15,15 @@ export default function HodPortal({ stats, user, activeTab }) {
   const [selectedCourseForEnroll, setSelectedCourseForEnroll] = useState('');
   const [selectedStudentForEnroll, setSelectedStudentForEnroll] = useState('');
   const [allocationMsg, setAllocationMsg] = useState('');
+
+  // Curriculum state
+  const [showCourseModal, setShowCourseModal] = useState(false);
+  const [newCode, setNewCode] = useState('');
+  const [newName, setNewName] = useState('');
+  const [newCredits, setNewCredits] = useState(3);
+  const [newSemester, setNewSemester] = useState('Fall 2026');
+  const [creatingCourse, setCreatingCourse] = useState(false);
+  const [courseMsg, setCourseMsg] = useState('');
 
   if (!stats) return <div style={{ color: '#aaa', padding: '40px' }}>Loading CSE HOD Portal...</div>;
 
@@ -101,6 +111,57 @@ export default function HodPortal({ stats, user, activeTab }) {
     }
   };
 
+  const handleCreateCourse = async (e) => {
+    e.preventDefault();
+    setCreatingCourse(true);
+    const token = localStorage.getItem('alexandria_token');
+    try {
+      const res = await fetch('/api/courses', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          code: newCode,
+          name: newName,
+          credits: Number(newCredits),
+          semester: newSemester
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to create course');
+
+      setCourseMsg('✅ New curriculum course added successfully!');
+      setShowCourseModal(false);
+      setNewCode('');
+      setNewName('');
+      setTimeout(() => setCourseMsg(''), 3000);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setCreatingCourse(false);
+    }
+  };
+
+  const handleDeleteCourse = async (courseId) => {
+    if (!window.confirm('Are you sure you want to remove this course from the department curriculum?')) return;
+    const token = localStorage.getItem('alexandria_token');
+    try {
+      const res = await fetch(`/api/courses/${courseId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      setCourseMsg('✅ Course removed successfully!');
+      setTimeout(() => setCourseMsg(''), 3000);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
   return (
     <div>
       {/* Welcome Banner */}
@@ -114,143 +175,89 @@ export default function HodPortal({ stats, user, activeTab }) {
         </p>
       </div>
 
-      {/* Main Grid Views */}
-      <div className="dashboard-grid">
-        {/* Executive Department Metrics */}
-        <div className="card-white" style={{ gridColumn: 'span 4' }}>
-          <div className="card-white-subtitle">FACULTY MEMBERS</div>
-          <div style={{ fontFamily: 'Playfair Display, serif', fontSize: '36px', fontWeight: 700, color: '#0d2847', marginTop: '6px' }}>
-            {teachersCount || 2} Professors
-          </div>
-          <p style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>Active CSE Instructors & Researchers</p>
-        </div>
-
-        <div className="card-white" style={{ gridColumn: 'span 4' }}>
-          <div className="card-white-subtitle">ENROLLED STUDENTS</div>
-          <div style={{ fontFamily: 'Playfair Display, serif', fontSize: '36px', fontWeight: 700, color: '#0f4c81', marginTop: '6px' }}>
-            {studentsCount || 2} Undergraduates
-          </div>
-          <p style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>Registered in CSE Batches</p>
-        </div>
-
-        <div className="card-white" style={{ gridColumn: 'span 4' }}>
-          <div className="card-white-subtitle">DEPARTMENT COURSES</div>
-          <div style={{ fontFamily: 'Playfair Display, serif', fontSize: '36px', fontWeight: 700, color: '#c5a059', marginTop: '6px' }}>
-            {coursesCount || 2} Syllabi
-          </div>
-          <p style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>Fall 2026 Curriculum</p>
-        </div>
-
-        {/* CSE Faculty Management */}
-        <div className="card-white" style={{ gridColumn: 'span 7' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h2 className="card-white-title">CSE Department Faculty</h2>
-            <span className="card-white-subtitle">STAFF ROSTER</span>
+      {/* 1. MAIN DASHBOARD HOME TAB */}
+      {(activeTab === 'dashboard' || !activeTab) && (
+        <div className="dashboard-grid">
+          {/* Executive Department Metrics */}
+          <div className="card-white" style={{ gridColumn: 'span 4' }}>
+            <div className="card-white-subtitle">FACULTY MEMBERS</div>
+            <div style={{ fontFamily: 'Playfair Display, serif', fontSize: '36px', fontWeight: 700, color: '#0d2847', marginTop: '6px' }}>
+              {teachersCount || 2} Professors
+            </div>
+            <p style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>Active CSE Instructors & Researchers</p>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {teachers.map((t) => (
-              <div key={t.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px', border: '1px solid #eae8e3', borderRadius: '8px', backgroundColor: '#faf9f6' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                  <img src={t.avatar} alt={t.name} style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }} />
-                  <div>
-                    <div style={{ fontFamily: 'Playfair Display, serif', fontSize: '16px', fontWeight: 700, color: '#111' }}>{t.name}</div>
-                    <div style={{ fontSize: '12px', color: '#0f4c81', fontWeight: 600 }}>{t.designation || 'Associate Professor'}</div>
-                    <div style={{ fontSize: '11px', color: '#666' }}>Spec: {t.specialization || 'Algorithms'}</div>
+          <div className="card-white" style={{ gridColumn: 'span 4' }}>
+            <div className="card-white-subtitle">ENROLLED STUDENTS</div>
+            <div style={{ fontFamily: 'Playfair Display, serif', fontSize: '36px', fontWeight: 700, color: '#0f4c81', marginTop: '6px' }}>
+              {studentsCount || 2} Undergraduates
+            </div>
+            <p style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>Registered in CSE Batches</p>
+          </div>
+
+          <div className="card-white" style={{ gridColumn: 'span 4' }}>
+            <div className="card-white-subtitle">DEPARTMENT COURSES</div>
+            <div style={{ fontFamily: 'Playfair Display, serif', fontSize: '36px', fontWeight: 700, color: '#c5a059', marginTop: '6px' }}>
+              {coursesCount || 2} Syllabi
+            </div>
+            <p style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>Fall 2026 Curriculum</p>
+          </div>
+
+          {/* CSE Faculty Management */}
+          <div className="card-white" style={{ gridColumn: 'span 7' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h2 className="card-white-title">CSE Department Faculty</h2>
+              <span className="card-white-subtitle">STAFF ROSTER</span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {teachers.map((t) => (
+                <div key={t.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px', border: '1px solid #eae8e3', borderRadius: '8px', backgroundColor: '#faf9f6' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <img src={t.avatar} alt={t.name} style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }} />
+                    <div>
+                      <div style={{ fontFamily: 'Playfair Display, serif', fontSize: '16px', fontWeight: 700, color: '#111' }}>{t.name}</div>
+                      <div style={{ fontSize: '12px', color: '#0f4c81', fontWeight: 600 }}>{t.designation || 'Associate Professor'}</div>
+                      <div style={{ fontSize: '11px', color: '#666' }}>Spec: {t.specialization || 'Algorithms'}</div>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <span style={{ fontSize: '11px', background: '#eef4fb', color: '#0f4c81', padding: '4px 8px', borderRadius: '4px', fontWeight: 600 }}>
+                      {t.office_room || 'Room 204'}
+                    </span>
                   </div>
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <span style={{ fontSize: '11px', background: '#eef4fb', color: '#0f4c81', padding: '4px 8px', borderRadius: '4px', fontWeight: 600 }}>
-                    {t.office_room || 'Room 204'}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Broadcast & Announcements Publisher */}
-        <div className="card-white" style={{ gridColumn: 'span 5' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h2 className="card-white-title">HOD Broadcasts</h2>
-            <button onClick={() => setShowNoticeModal(true)} className="btn-primary" style={{ padding: '6px 12px', fontSize: '12px' }}>
-              + New Broadcast
-            </button>
+              ))}
+            </div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {announcements.map((ann) => (
-              <div key={ann.id} style={{ padding: '14px', border: '1px solid #eae8e3', borderRadius: '8px', backgroundColor: '#ffffff' }}>
-                <div style={{ fontSize: '11px', color: '#c5a059', fontWeight: 700, textTransform: 'uppercase' }}>
-                  Target: {ann.target_role}
+          {/* Broadcast & Announcements Publisher */}
+          <div className="card-white" style={{ gridColumn: 'span 5' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h2 className="card-white-title">HOD Broadcasts</h2>
+              <button onClick={() => setShowNoticeModal(true)} className="btn-primary" style={{ padding: '6px 12px', fontSize: '12px' }}>
+                + New Broadcast
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {announcements.map((ann) => (
+                <div key={ann.id} style={{ padding: '14px', border: '1px solid #eae8e3', borderRadius: '8px', backgroundColor: '#ffffff' }}>
+                  <div style={{ fontSize: '11px', color: '#c5a059', fontWeight: 700, textTransform: 'uppercase' }}>
+                    Target: {ann.target_role}
+                  </div>
+                  <div style={{ fontFamily: 'Playfair Display, serif', fontSize: '15px', fontWeight: 700, color: '#111', margin: '4px 0' }}>
+                    {ann.title}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#555', lineHeight: 1.4 }}>{ann.content}</div>
                 </div>
-                <div style={{ fontFamily: 'Playfair Display, serif', fontSize: '15px', fontWeight: 700, color: '#111', margin: '4px 0' }}>
-                  {ann.title}
-                </div>
-                <div style={{ fontSize: '12px', color: '#555', lineHeight: 1.4 }}>{ann.content}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Broadcast Modal */}
-      {showNoticeModal && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <h2 className="modal-header">Post HOD Department Broadcast</h2>
-            <form onSubmit={handlePublishBroadcast}>
-              <div className="form-group">
-                <label className="form-label">Broadcast Target Audience</label>
-                <select className="input-field" value={targetRole} onChange={e => setTargetRole(e.target.value)}>
-                  <option value="all">Everyone in CSE (Teachers + Students)</option>
-                  <option value="student">CSE Students Only</option>
-                  <option value="teacher">CSE Faculty Only</option>
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Announcement Title</label>
-                <input 
-                  type="text" 
-                  className="input-field" 
-                  placeholder="e.g. Midterm Examination & Research Symposium Notice"
-                  value={noticeTitle}
-                  onChange={e => setNoticeTitle(e.target.value)}
-                  required 
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Broadcast Message Content</label>
-                <textarea 
-                  className="input-field" 
-                  rows="5"
-                  placeholder="Official HOD directive content..."
-                  value={noticeContent}
-                  onChange={e => setNoticeContent(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' }}>
-                <button 
-                  type="button" 
-                  onClick={() => setShowNoticeModal(false)}
-                  style={{ padding: '8px 16px', background: '#e5e3dc', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
-                >
-                  Cancel
-                </button>
-                <button type="submit" className="btn-primary" disabled={publishing}>
-                  {publishing ? 'Publishing...' : 'Publish Broadcast'}
-                </button>
-              </div>
-            </form>
+              ))}
+            </div>
           </div>
         </div>
       )}
 
-      {/* Tab: Attendance Reports & Low Attendance Alerts */}
+      {/* 2. DEDICATED TAB: CLASS ATTENDANCE & ALERTS */}
       {activeTab === 'attendance' && (
         <div className="dashboard-grid">
           {/* Low Attendance Alert Banner */}
@@ -326,7 +333,7 @@ export default function HodPortal({ stats, user, activeTab }) {
         </div>
       )}
 
-      {/* Tab: Subject & Faculty Allocations */}
+      {/* 3. DEDICATED TAB: SUBJECT & FACULTY ALLOCATIONS */}
       {activeTab === 'allocation' && (
         <div className="dashboard-grid">
           <div className="card-white" style={{ gridColumn: 'span 12' }}>
@@ -394,6 +401,180 @@ export default function HodPortal({ stats, user, activeTab }) {
                 </form>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. DEDICATED TAB: CURRICULUM & SYLLABI */}
+      {activeTab === 'curriculum' && (
+        <div className="dashboard-grid">
+          <div className="card-white" style={{ gridColumn: 'span 12' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div>
+                <h2 className="card-white-title">CSE Academic Curriculum & Syllabi</h2>
+                <p style={{ fontSize: '13px', color: '#666' }}>Manage courses, credit weights, and semester offerings for CSE.</p>
+              </div>
+              <button onClick={() => setShowCourseModal(true)} className="btn-primary" style={{ padding: '8px 16px', fontSize: '13px' }}>
+                + Add New Course
+              </button>
+            </div>
+
+            {courseMsg && <div style={{ color: '#15803d', fontWeight: 700, padding: '12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', marginBottom: '20px' }}>{courseMsg}</div>}
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
+              {courses.map(course => (
+                <div key={course.id} style={{ border: '1px solid #e2dfd7', borderRadius: '10px', padding: '20px', backgroundColor: '#faf9f6' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 800, background: '#0d2847', color: '#ffffff', padding: '4px 10px', borderRadius: '6px' }}>
+                      {course.code}
+                    </span>
+                    <button onClick={() => handleDeleteCourse(course.id)} style={{ background: 'none', border: 'none', color: '#b91c1c', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 600 }}>
+                      <Trash2 size={14} /> Remove
+                    </button>
+                  </div>
+                  <h3 style={{ fontFamily: 'Playfair Display, serif', fontSize: '18px', fontWeight: 700 }}>{course.name}</h3>
+                  <div style={{ marginTop: '12px', fontSize: '12px', color: '#555', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Credits: <strong>{course.credits}</strong></span>
+                    <span>Semester: <strong>{course.semester}</strong></span>
+                  </div>
+                  <div style={{ marginTop: '8px', fontSize: '12px', color: '#0f4c81', fontWeight: 600 }}>
+                    Faculty Instructor: {course.teacher_name || 'Unassigned'}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. DEDICATED TAB: PROFILE SETTINGS */}
+      {activeTab === 'settings' && (
+        <SettingsTab user={user} />
+      )}
+
+      {/* Broadcast Modal */}
+      {showNoticeModal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h2 className="modal-header">Post HOD Department Broadcast</h2>
+            <form onSubmit={handlePublishBroadcast}>
+              <div className="form-group">
+                <label className="form-label">Broadcast Target Audience</label>
+                <select className="input-field" value={targetRole} onChange={e => setTargetRole(e.target.value)}>
+                  <option value="all">Everyone in CSE (Teachers + Students)</option>
+                  <option value="student">CSE Students Only</option>
+                  <option value="teacher">CSE Faculty Only</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Announcement Title</label>
+                <input 
+                  type="text" 
+                  className="input-field" 
+                  placeholder="e.g. Midterm Examination & Research Symposium Notice"
+                  value={noticeTitle}
+                  onChange={e => setNoticeTitle(e.target.value)}
+                  required 
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Broadcast Message Content</label>
+                <textarea 
+                  className="input-field" 
+                  rows="5"
+                  placeholder="Official HOD directive content..."
+                  value={noticeContent}
+                  onChange={e => setNoticeContent(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' }}>
+                <button 
+                  type="button" 
+                  onClick={() => setShowNoticeModal(false)}
+                  style={{ padding: '8px 16px', background: '#e5e3dc', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary" disabled={publishing}>
+                  {publishing ? 'Publishing...' : 'Publish Broadcast'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Course Modal */}
+      {showCourseModal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h2 className="modal-header">Add New Curriculum Course</h2>
+            <form onSubmit={handleCreateCourse}>
+              <div className="form-group">
+                <label className="form-label">Course Code</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder="e.g. CSE-501"
+                  value={newCode}
+                  onChange={e => setNewCode(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Course Name</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder="e.g. Neural Networks & Deep Learning"
+                  value={newName}
+                  onChange={e => setNewName(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="form-group">
+                  <label className="form-label">Credits</label>
+                  <input
+                    type="number"
+                    className="input-field"
+                    value={newCredits}
+                    onChange={e => setNewCredits(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Semester</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={newSemester}
+                    onChange={e => setNewSemester(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowCourseModal(false)}
+                  style={{ padding: '8px 16px', background: '#e5e3dc', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary" disabled={creatingCourse}>
+                  {creatingCourse ? 'Adding...' : 'Add Course'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

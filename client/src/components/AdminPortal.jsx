@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { GraduationCap, Users, Shield, PlusCircle, Building } from 'lucide-react';
+import { GraduationCap, Users, Shield, PlusCircle, Building, Trash2 } from 'lucide-react';
+import SettingsTab from './SettingsTab';
 
 export default function AdminPortal({ stats, user, activeTab }) {
   const [allUsers, setAllUsers] = useState([]);
@@ -29,7 +30,7 @@ export default function AdminPortal({ stats, user, activeTab }) {
   };
 
   useEffect(() => {
-    if (activeTab === 'users') {
+    if (activeTab === 'users' || activeTab === 'dashboard' || !activeTab) {
       fetchUsers();
     }
   }, [activeTab]);
@@ -73,6 +74,25 @@ export default function AdminPortal({ stats, user, activeTab }) {
     }
   };
 
+  const handleDeleteUser = async (userId, userName) => {
+    if (!window.confirm(`Are you sure you want to permanently delete the user account for "${userName}"?`)) return;
+    const token = localStorage.getItem('alexandria_token');
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      setUserMsg(`✅ User "${userName}" deleted successfully.`);
+      fetchUsers();
+      setTimeout(() => setUserMsg(''), 4000);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
   if (!stats) return <div style={{ color: '#aaa', padding: '40px' }}>Loading System Governance Portal...</div>;
 
   const { totalDepartments, totalUsers, usersByRole, departmentsList } = stats;
@@ -90,65 +110,106 @@ export default function AdminPortal({ stats, user, activeTab }) {
         </p>
       </div>
 
-      {/* Main Grid Views */}
-      <div className="dashboard-grid">
-        <div className="card-white" style={{ gridColumn: 'span 4' }}>
-          <div className="card-white-subtitle">INSTITUTIONAL DEPARTMENTS</div>
-          <div style={{ fontFamily: 'Playfair Display, serif', fontSize: '36px', fontWeight: 700, color: '#0d2847', marginTop: '6px' }}>
-            {totalDepartments} Academic Depts
-          </div>
-          <p style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>CSE, ECE, ME, Electrical Engineering</p>
-        </div>
-
-        <div className="card-white" style={{ gridColumn: 'span 4' }}>
-          <div className="card-white-subtitle">REGISTERED ERP USERS</div>
-          <div style={{ fontFamily: 'Playfair Display, serif', fontSize: '36px', fontWeight: 700, color: '#0f4c81', marginTop: '6px' }}>
-            {totalUsers} Accounts
-          </div>
-          <p style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>Database Authenticated Users</p>
-        </div>
-
-        <div className="card-white" style={{ gridColumn: 'span 4' }}>
-          <div className="card-white-subtitle">SYSTEM STATUS</div>
-          <div style={{ fontFamily: 'Playfair Display, serif', fontSize: '36px', fontWeight: 700, color: '#15803d', marginTop: '6px' }}>
-            Active & Synced
-          </div>
-          <p style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>SQLite Centralized Database</p>
-        </div>
-
-        {/* Departments Overview List */}
-        <div className="card-white" style={{ gridColumn: 'span 12' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <h2 className="card-white-title">Departments & Academic Leadership</h2>
-            <span className="card-white-subtitle">MULTI-DEPARTMENT ERP</span>
+      {/* 1. DASHBOARD HOME TAB */}
+      {(activeTab === 'dashboard' || !activeTab) && (
+        <div className="dashboard-grid">
+          <div className="card-white" style={{ gridColumn: 'span 4' }}>
+            <div className="card-white-subtitle">INSTITUTIONAL DEPARTMENTS</div>
+            <div style={{ fontFamily: 'Playfair Display, serif', fontSize: '36px', fontWeight: 700, color: '#0d2847', marginTop: '6px' }}>
+              {totalDepartments} Academic Depts
+            </div>
+            <p style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>CSE, ECE, ME, Electrical Engineering</p>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
-            {departmentsList.map(d => (
-              <div key={d.id} style={{ border: '1px solid #e2dfd7', borderRadius: '10px', padding: '20px', backgroundColor: '#faf9f6' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                  <span style={{ fontSize: '14px', fontWeight: 800, color: '#ffffff', background: '#0d2847', padding: '4px 12px', borderRadius: '6px' }}>
-                    {d.code}
-                  </span>
-                  <span style={{ fontSize: '12px', color: '#666' }}>ID: #{d.id}</span>
+          <div className="card-white" style={{ gridColumn: 'span 4' }}>
+            <div className="card-white-subtitle">REGISTERED ERP USERS</div>
+            <div style={{ fontFamily: 'Playfair Display, serif', fontSize: '36px', fontWeight: 700, color: '#0f4c81', marginTop: '6px' }}>
+              {totalUsers} Accounts
+            </div>
+            <p style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>Database Authenticated Users</p>
+          </div>
+
+          <div className="card-white" style={{ gridColumn: 'span 4' }}>
+            <div className="card-white-subtitle">SYSTEM STATUS</div>
+            <div style={{ fontFamily: 'Playfair Display, serif', fontSize: '36px', fontWeight: 700, color: '#15803d', marginTop: '6px' }}>
+              Active & Synced
+            </div>
+            <p style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>SQLite Centralized Database</p>
+          </div>
+
+          {/* Departments Overview List */}
+          <div className="card-white" style={{ gridColumn: 'span 12' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h2 className="card-white-title">Departments & Academic Leadership Overview</h2>
+              <span className="card-white-subtitle">MULTI-DEPARTMENT ERP</span>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
+              {departmentsList.map(d => (
+                <div key={d.id} style={{ border: '1px solid #e2dfd7', borderRadius: '10px', padding: '20px', backgroundColor: '#faf9f6' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <span style={{ fontSize: '14px', fontWeight: 800, color: '#ffffff', background: '#0d2847', padding: '4px 12px', borderRadius: '6px' }}>
+                      {d.code}
+                    </span>
+                    <span style={{ fontSize: '12px', color: '#666' }}>ID: #{d.id}</span>
+                  </div>
+                  <h3 style={{ fontFamily: 'Playfair Display, serif', fontSize: '20px', fontWeight: 700, color: '#111' }}>{d.name}</h3>
+                  <p style={{ fontSize: '13px', color: '#555', marginTop: '6px', lineHeight: 1.4 }}>{d.description}</p>
+                  <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid #eae8e3', display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                    <div>👔 HOD: <strong>{d.hod_name || 'Dr. Alan Turing'}</strong></div>
+                    <div>👨‍🏫 Faculty: <strong>{d.teacher_count || 0}</strong> • 🎓 Students: <strong>{d.student_count || 0}</strong></div>
+                  </div>
                 </div>
-                <h3 style={{ fontFamily: 'Playfair Display, serif', fontSize: '20px', fontWeight: 700, color: '#111' }}>{d.name}</h3>
-                <p style={{ fontSize: '13px', color: '#555', marginTop: '6px', lineHeight: 1.4 }}>{d.description}</p>
-                <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid #eae8e3', display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-                  <div>👔 HOD: <strong>{d.hod_name || 'Dr. Alan Turing'}</strong></div>
-                  <div>👨‍🏫 Faculty: <strong>{d.teacher_count || 0}</strong> • 🎓 Students: <strong>{d.student_count || 0}</strong></div>
-                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. DEDICATED TAB: DEPARTMENTS */}
+      {activeTab === 'departments' && (
+        <div className="dashboard-grid">
+          <div className="card-white" style={{ gridColumn: 'span 12' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div>
+                <h2 className="card-white-title">Academic Departments Registry</h2>
+                <p style={{ fontSize: '13px', color: '#666' }}>Central governance and department isolation structure.</p>
               </div>
-            ))}
+              <span className="card-white-subtitle">{departmentsList.length} ACTIVE DEPARTMENTS</span>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
+              {departmentsList.map(d => (
+                <div key={d.id} style={{ border: '1px solid #e2dfd7', borderRadius: '10px', padding: '20px', backgroundColor: '#faf9f6' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <span style={{ fontSize: '14px', fontWeight: 800, color: '#ffffff', background: '#0d2847', padding: '4px 12px', borderRadius: '6px' }}>
+                      {d.code}
+                    </span>
+                    <span style={{ fontSize: '12px', color: '#15803d', fontWeight: 700 }}>✓ Active Isolation</span>
+                  </div>
+                  <h3 style={{ fontFamily: 'Playfair Display, serif', fontSize: '20px', fontWeight: 700, color: '#111' }}>{d.name}</h3>
+                  <p style={{ fontSize: '13px', color: '#555', marginTop: '6px', lineHeight: 1.4 }}>{d.description}</p>
+                  <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid #eae8e3', display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                    <div>👔 HOD: <strong>{d.hod_name || 'Dr. Alan Turing'}</strong></div>
+                    <div>👨‍🏫 Faculty: <strong>{d.teacher_count || 0}</strong> • 🎓 Students: <strong>{d.student_count || 0}</strong></div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
+      )}
 
-        {/* Global User Management Directory */}
-        {activeTab === 'users' && (
+      {/* 3. DEDICATED TAB: USER MANAGEMENT */}
+      {activeTab === 'users' && (
+        <div className="dashboard-grid">
           <div className="card-white" style={{ gridColumn: 'span 12' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h2 className="card-white-title">Global ERP Users Registry</h2>
-              <button onClick={() => setShowCreateModal(true)} className="btn-primary" style={{ padding: '6px 14px', fontSize: '13px' }}>
+              <div>
+                <h2 className="card-white-title">Global ERP Users Registry</h2>
+                <p style={{ fontSize: '13px', color: '#666' }}>System-wide user accounts across Students, Teachers, HODs, and Admins.</p>
+              </div>
+              <button onClick={() => setShowCreateModal(true)} className="btn-primary" style={{ padding: '8px 16px', fontSize: '13px' }}>
                 + Create Student / Teacher Account
               </button>
             </div>
@@ -166,6 +227,7 @@ export default function AdminPortal({ stats, user, activeTab }) {
                     <th style={{ padding: '10px' }}>Role</th>
                     <th style={{ padding: '10px' }}>Department</th>
                     <th style={{ padding: '10px' }}>Identifier / Roll</th>
+                    <th style={{ padding: '10px' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -178,16 +240,28 @@ export default function AdminPortal({ stats, user, activeTab }) {
                       </td>
                       <td style={{ padding: '10px' }}>{u.dept_code || 'CSE'}</td>
                       <td style={{ padding: '10px', color: '#777' }}>{u.roll_number || u.employee_id || 'N/A'}</td>
+                      <td style={{ padding: '10px' }}>
+                        {u.role !== 'admin' && (
+                          <button
+                            onClick={() => handleDeleteUser(u.id, u.name)}
+                            style={{ background: 'none', border: 'none', color: '#b91c1c', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 600 }}
+                          >
+                            <Trash2 size={14} /> Delete
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             )}
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Tab: Institutional Attendance */}
-        {activeTab === 'attendance' && (
+      {/* 4. DEDICATED TAB: INSTITUTIONAL ATTENDANCE */}
+      {activeTab === 'attendance' && (
+        <div className="dashboard-grid">
           <div className="card-white" style={{ gridColumn: 'span 12' }}>
             <h2 className="card-white-title" style={{ marginBottom: '12px' }}>Institutional Attendance Governance Report</h2>
             <p style={{ fontSize: '13px', color: '#666', marginBottom: '20px' }}>
@@ -211,8 +285,13 @@ export default function AdminPortal({ stats, user, activeTab }) {
               ))}
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* 5. DEDICATED TAB: PROFILE SETTINGS */}
+      {activeTab === 'settings' && (
+        <SettingsTab user={user} />
+      )}
 
       {/* Admin Create User Modal */}
       {showCreateModal && (
