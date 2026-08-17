@@ -378,7 +378,15 @@ export default function TeacherPortal({ stats, user, activeTab }) {
 
       {/* 2. DEDICATED TAB: TAKE ATTENDANCE */}
       {activeTab === 'attendance' && (
-        <div className="dashboard-grid">
+        <div>
+          <YearSelector
+            selectedYear={selectedYear}
+            onSelectYear={setSelectedYear}
+            firstYearCount={firstYearStudents.length}
+            secondYearCount={secondYearStudents.length}
+            title="Attendance Batch Filter"
+          />
+          <div className="dashboard-grid">
           <div className="card-white" style={{ gridColumn: 'span 12' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <div>
@@ -501,11 +509,20 @@ export default function TeacherPortal({ stats, user, activeTab }) {
             </form>
           </div>
         </div>
+        </div>
       )}
 
       {/* 3. DEDICATED TAB: CSE STUDENTS DIRECTORY */}
       {activeTab === 'students' && (
-        <div className="dashboard-grid">
+        <div>
+          <YearSelector
+            selectedYear={selectedYear}
+            onSelectYear={setSelectedYear}
+            firstYearCount={firstYearStudents.length}
+            secondYearCount={secondYearStudents.length}
+            title="Students Year Filter"
+          />
+          <div className="dashboard-grid">
           <div className="card-white" style={{ gridColumn: 'span 12' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <div>
@@ -539,11 +556,20 @@ export default function TeacherPortal({ stats, user, activeTab }) {
             </div>
           </div>
         </div>
+        </div>
       )}
 
       {/* 4. DEDICATED TAB: ACADEMIC CONTROL (COURSES) */}
       {activeTab === 'courses' && (
-        <div className="dashboard-grid">
+        <div>
+          <YearSelector
+            selectedYear={selectedYear}
+            onSelectYear={setSelectedYear}
+            firstYearCount={firstYearStudents.length}
+            secondYearCount={secondYearStudents.length}
+            title="Courses Year Filter"
+          />
+          <div className="dashboard-grid">
           <div className="card-white" style={{ gridColumn: 'span 12' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <div>
@@ -572,6 +598,7 @@ export default function TeacherPortal({ stats, user, activeTab }) {
               ))}
             </div>
           </div>
+        </div>
         </div>
       )}
 

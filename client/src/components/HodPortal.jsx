@@ -483,7 +483,15 @@ export default function HodPortal({ stats, user, activeTab }) {
 
       {/* 2. DEDICATED TAB: CLASS ATTENDANCE & ALERTS */}
       {activeTab === 'attendance' && (
-        <div className="dashboard-grid">
+        <div>
+          <YearSelector
+            selectedYear={selectedYear}
+            onSelectYear={setSelectedYear}
+            firstYearCount={firstYearStudents.length}
+            secondYearCount={secondYearStudents.length}
+            title="Class Attendance Year Filter"
+          />
+          <div className="dashboard-grid">
           {/* Low Attendance Alert Banner */}
           <div className="card-white" style={{ gridColumn: 'span 12' }}>
             <h2 className="card-white-title" style={{ color: '#b91c1c', marginBottom: '8px' }}>
@@ -563,12 +571,21 @@ export default function HodPortal({ stats, user, activeTab }) {
             </table>
           </div>
         </div>
+        </div>
       )}
 
       {/* 3. DEDICATED TAB: SUBJECT & FACULTY ALLOCATIONS */}
       {activeTab === 'allocation' && (
-        <div className="dashboard-grid">
-          <div className="card-white" style={{ gridColumn: 'span 12' }}>
+        <div>
+          <YearSelector
+            selectedYear={selectedYear}
+            onSelectYear={setSelectedYear}
+            firstYearCount={firstYearStudents.length}
+            secondYearCount={secondYearStudents.length}
+            title="Allocations Batch Filter"
+          />
+          <div className="dashboard-grid">
+            <div className="card-white" style={{ gridColumn: 'span 12' }}>
             <h2 className="card-white-title">HOD Subject & Class Allocation Control</h2>
             <p style={{ fontSize: '13px', color: '#666', marginBottom: '20px' }}>
               Assign faculty instructors to CSE subjects and enroll students into 1st Year / 2nd Year classes.
@@ -639,11 +656,20 @@ export default function HodPortal({ stats, user, activeTab }) {
             </div>
           </div>
         </div>
+        </div>
       )}
 
       {/* 4. DEDICATED TAB: CURRICULUM & SYLLABI */}
       {activeTab === 'curriculum' && (
-        <div className="dashboard-grid">
+        <div>
+          <YearSelector
+            selectedYear={selectedYear}
+            onSelectYear={setSelectedYear}
+            firstYearCount={firstYearStudents.length}
+            secondYearCount={secondYearStudents.length}
+            title="Curriculum Year Filter"
+          />
+          <div className="dashboard-grid">
           <div className="card-white" style={{ gridColumn: 'span 12' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <div>
@@ -680,6 +706,7 @@ export default function HodPortal({ stats, user, activeTab }) {
               ))}
             </div>
           </div>
+        </div>
         </div>
       )}
 

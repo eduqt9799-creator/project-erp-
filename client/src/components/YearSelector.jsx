@@ -1,7 +1,7 @@
 import React from 'react';
-import { Calendar, Filter, Sparkles } from 'lucide-react';
+import { Filter, Sparkles } from 'lucide-react';
 
-export default function YearSelector({ selectedYear, onSelectYear, firstYearCount, secondYearCount }) {
+export default function YearSelector({ selectedYear, onSelectYear, firstYearCount, secondYearCount, title = "Academic Batch Division" }) {
   return (
     <div style={{
       display: 'flex',
@@ -9,42 +9,39 @@ export default function YearSelector({ selectedYear, onSelectYear, firstYearCoun
       justify: 'space-between',
       backgroundColor: '#ffffff',
       border: '1px solid #e2dfd7',
-      borderRadius: '10px',
-      padding: '12px 18px',
-      marginBottom: '24px',
-      boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+      borderRadius: '8px',
+      padding: '10px 16px',
+      marginBottom: '20px',
+      boxShadow: '0 1px 4px rgba(0,0,0,0.02)',
       flexWrap: 'wrap',
-      gap: '12px'
+      gap: '10px'
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <div style={{
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <span style={{
           backgroundColor: '#0d2847',
           color: '#ffffff',
-          padding: '6px 10px',
-          borderRadius: '6px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          fontSize: '12px',
+          padding: '4px 8px',
+          borderRadius: '4px',
+          fontSize: '11px',
           fontWeight: 700,
           textTransform: 'uppercase',
-          letterSpacing: '0.5px'
+          letterSpacing: '0.5px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px'
         }}>
-          <Filter size={14} /> Batch / Year Filter
-        </div>
-        <span style={{ fontSize: '13px', color: '#555', fontWeight: 600 }}>
-          Select Academic Year Division:
+          <Filter size={12} /> {title}
         </span>
       </div>
 
-      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
         <button
           type="button"
           onClick={() => onSelectYear(0)}
           style={{
-            padding: '8px 16px',
+            padding: '6px 14px',
             borderRadius: '6px',
-            fontSize: '13px',
+            fontSize: '12px',
             fontWeight: 700,
             cursor: 'pointer',
             border: '1px solid',
@@ -54,16 +51,16 @@ export default function YearSelector({ selectedYear, onSelectYear, firstYearCoun
             borderColor: selectedYear === 0 ? '#0d2847' : '#dcd9d0'
           }}
         >
-          🎓 All Years
+          🎓 All Batches
         </button>
 
         <button
           type="button"
           onClick={() => onSelectYear(1)}
           style={{
-            padding: '8px 16px',
+            padding: '6px 14px',
             borderRadius: '6px',
-            fontSize: '13px',
+            fontSize: '12px',
             fontWeight: 700,
             cursor: 'pointer',
             border: '1px solid',
@@ -73,16 +70,16 @@ export default function YearSelector({ selectedYear, onSelectYear, firstYearCoun
             borderColor: selectedYear === 1 ? '#0f4c81' : '#dcd9d0'
           }}
         >
-          🥇 1st Year {firstYearCount !== undefined && `(${firstYearCount})`}
+          🥇 First Year {firstYearCount !== undefined && `(${firstYearCount})`}
         </button>
 
         <button
           type="button"
           onClick={() => onSelectYear(2)}
           style={{
-            padding: '8px 16px',
+            padding: '6px 14px',
             borderRadius: '6px',
-            fontSize: '13px',
+            fontSize: '12px',
             fontWeight: 700,
             cursor: 'pointer',
             border: '1px solid',
@@ -92,12 +89,12 @@ export default function YearSelector({ selectedYear, onSelectYear, firstYearCoun
             borderColor: selectedYear === 2 ? '#c5a059' : '#dcd9d0'
           }}
         >
-          🥈 2nd Year {secondYearCount !== undefined && `(${secondYearCount})`}
+          🥈 Second Year {secondYearCount !== undefined && `(${secondYearCount})`}
         </button>
       </div>
 
       <div style={{ fontSize: '11px', color: '#888', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '4px' }}>
-        <Sparkles size={12} color="#c5a059" /> 3rd & 4th Years coming next semester
+        <Sparkles size={12} color="#c5a059" /> +3rd & 4th Years coming soon
       </div>
     </div>
   );
