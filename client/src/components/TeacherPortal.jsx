@@ -236,15 +236,7 @@ export default function TeacherPortal({ stats, user, activeTab }) {
         </p>
       </div>
 
-      {/* Academic Year Switcher Bar (1st Year / 2nd Year / All Years) */}
-      {activeTab !== 'settings' && (
-        <YearSelector
-          selectedYear={selectedYear}
-          onSelectYear={setSelectedYear}
-          firstYearCount={firstYearStudents.length}
-          secondYearCount={secondYearStudents.length}
-        />
-      )}
+
 
       {/* 1. DASHBOARD HOME TAB */}
       {(activeTab === 'dashboard' || !activeTab) && (

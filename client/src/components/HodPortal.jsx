@@ -323,21 +323,11 @@ export default function HodPortal({ stats, user, activeTab }) {
         <div className="dept-pill">
           👔 HOD Executive Portal • {department?.code || 'CSE'} Department
         </div>
-        <h1 className="welcome-title">Welcome back, Dr. Turing.</h1>
+        <h1 className="welcome-title">Welcome back, {user?.name || 'Dr. Arun'}.</h1>
         <p className="welcome-subtitle">
           Head of Department Administration for {department?.name || 'Computer Science & Engineering'}. Manage department faculty, student enrollment, and academic policy.
         </p>
       </div>
-
-      {/* Academic Year Switcher Bar (1st Year / 2nd Year / All Years) */}
-      {activeTab !== 'settings' && (
-        <YearSelector
-          selectedYear={selectedYear}
-          onSelectYear={setSelectedYear}
-          firstYearCount={firstYearStudents.length}
-          secondYearCount={secondYearStudents.length}
-        />
-      )}
 
       {/* 1. MAIN DASHBOARD HOME TAB */}
       {(activeTab === 'dashboard' || !activeTab) && (

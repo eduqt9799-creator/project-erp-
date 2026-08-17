@@ -186,7 +186,7 @@ export default function AuthModal({ onLoginSuccess, onRegisterSuccess }) {
               onClick={() => loginDemo('hod.cse@alexandria.edu')}
               style={{ padding: '8px 10px', fontSize: '11px', background: '#f4f3ee', border: '1px solid #dcd9d0', borderRadius: '6px', cursor: 'pointer', textAlign: 'left' }}
             >
-              👔 <strong>CSE HOD</strong> (Dr. Turing)
+              👔 <strong>CSE HOD</strong> (Dr. Arun)
             </button>
             <button 
               type="button"

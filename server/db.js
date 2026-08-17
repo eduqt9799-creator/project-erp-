@@ -171,14 +171,14 @@ db.serialize(() => {
       db.run(`INSERT INTO profiles (user_id, phone, bio, office_room, employee_id, designation) VALUES 
         (1, '+1-800-ALEXANDRIA', 'Chief Academic Administrator & Governance Officer', 'Admin Suite 101', 'EMP-ADM-001', 'System Chancellor')`);
 
-      // 2. CSE HOD (Dr. Alan Turing, id: 2)
+      // 2. CSE HOD (Dr. Arun, id: 2)
       db.run(
         `INSERT INTO users (id, name, email, password, role, department_id, profile_completed, avatar) VALUES 
-         (2, 'Dr. Alan Turing', 'hod.cse@alexandria.edu', ?, 'hod', 1, 1, 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200')`,
+         (2, 'Dr. Arun', 'hod.cse@alexandria.edu', ?, 'hod', 1, 1, 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200')`,
         [defaultHash]
       );
       db.run(`INSERT INTO profiles (user_id, phone, bio, office_room, employee_id, designation, specialization) VALUES 
-        (2, '+1-555-0192', 'Head of Department - Computer Science & Engineering. Pioneer in Computational Theory.', 'Turing Building 402', 'EMP-CSE-HOD', 'Head of Department', 'Theoretical Computer Science & AI')`);
+        (2, '+1-555-0192', 'Head of Department - Computer Science & Engineering.', 'Turing Building 402', 'EMP-CSE-HOD', 'Head of Department', 'Theoretical Computer Science & Software Engineering')`);
 
       // 3. CSE Teacher (Prof. Ada Lovelace, id: 3)
       db.run(
