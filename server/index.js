@@ -1099,7 +1099,7 @@ app.delete('/api/admin/users/:id', authenticateToken, requireRole('admin'), asyn
 // ==========================================
 
 // Handle 404 for unknown API routes
-app.use('/api/*', (req, res) => {
+app.use('/api/*splat', (req, res) => {
   res.status(404).json({ error: `API endpoint ${req.method} ${req.path} not found` });
 });
 
