@@ -24,7 +24,7 @@ export default function App() {
     }
 
     try {
-      const res = await fetch('http://localhost:5000/api/auth/me', {
+      const res = await fetch('/api/auth/me', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
@@ -48,7 +48,7 @@ export default function App() {
     const token = localStorage.getItem('alexandria_token');
 
     try {
-      const res = await fetch('http://localhost:5000/api/dashboard/stats', {
+      const res = await fetch('/api/dashboard/stats', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();

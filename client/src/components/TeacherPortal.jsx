@@ -50,7 +50,7 @@ export default function TeacherPortal({ stats, user, activeTab }) {
     }));
 
     try {
-      const res = await fetch('http://localhost:5000/api/attendance/bulk', {
+      const res = await fetch('/api/attendance/bulk', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -81,7 +81,7 @@ export default function TeacherPortal({ stats, user, activeTab }) {
 
     const token = localStorage.getItem('alexandria_token');
     try {
-      const res = await fetch('http://localhost:5000/api/assignments', {
+      const res = await fetch('/api/assignments', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -113,7 +113,7 @@ export default function TeacherPortal({ stats, user, activeTab }) {
     e.preventDefault();
     const token = localStorage.getItem('alexandria_token');
     try {
-      const res = await fetch('http://localhost:5000/api/attendance', {
+      const res = await fetch('/api/attendance', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -13,7 +13,7 @@ export default function AuthModal({ onLoginSuccess, onRegisterSuccess }) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetch('http://localhost:5000/api/departments')
+    fetch('/api/departments')
       .then(res => res.json())
       .then(data => {
         setDepartments(data);
@@ -33,7 +33,7 @@ export default function AuthModal({ onLoginSuccess, onRegisterSuccess }) {
       : { email, password };
 
     try {
-      const res = await fetch(`http://localhost:5000${endpoint}`, {
+      const res = await fetch(`${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -64,7 +64,7 @@ export default function AuthModal({ onLoginSuccess, onRegisterSuccess }) {
     setLoading(true);
 
     try {
-      const res = await fetch('http://localhost:5000/api/auth/login', {
+      const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: demoEmail, password: 'password123' })

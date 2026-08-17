@@ -23,7 +23,7 @@ export default function HodPortal({ stats, user, activeTab }) {
     e.preventDefault();
     const token = localStorage.getItem('alexandria_token');
     try {
-      const res = await fetch('http://localhost:5000/api/courses/assign', {
+      const res = await fetch('/api/courses/assign', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -49,7 +49,7 @@ export default function HodPortal({ stats, user, activeTab }) {
     const token = localStorage.getItem('alexandria_token');
     const courseId = Number(selectedCourseForEnroll || courses[0]?.id);
     try {
-      const res = await fetch(`http://localhost:5000/api/courses/${courseId}/enroll`, {
+      const res = await fetch(`/api/courses/${courseId}/enroll`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -75,7 +75,7 @@ export default function HodPortal({ stats, user, activeTab }) {
 
     const token = localStorage.getItem('alexandria_token');
     try {
-      const res = await fetch('http://localhost:5000/api/announcements', {
+      const res = await fetch('/api/announcements', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

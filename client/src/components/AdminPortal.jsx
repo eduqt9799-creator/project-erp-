@@ -19,7 +19,7 @@ export default function AdminPortal({ stats, user, activeTab }) {
   const fetchUsers = () => {
     setLoadingUsers(true);
     const token = localStorage.getItem('alexandria_token');
-    fetch('http://localhost:5000/api/users', {
+    fetch('/api/users', {
       headers: { 'Authorization': `Bearer ${token}` }
     })
       .then(res => res.json())
@@ -39,7 +39,7 @@ export default function AdminPortal({ stats, user, activeTab }) {
     setCreatingUser(true);
     const token = localStorage.getItem('alexandria_token');
     try {
-      const res = await fetch('http://localhost:5000/api/admin/users', {
+      const res = await fetch('/api/admin/users', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

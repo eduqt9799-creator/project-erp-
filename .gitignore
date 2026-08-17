@@ -9,11 +9,16 @@ build/
 client/dist/
 client/build/
 
-# Environment variables
+# Environment variables (never commit real secrets)
 .env
 .env.local
 .env.*.local
 *.env
+
+# SQLite database (contains real user data)
+*.db
+*.sqlite
+*.sqlite3
 
 # Logs
 *.log

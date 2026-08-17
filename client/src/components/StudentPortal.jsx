@@ -22,7 +22,7 @@ export default function StudentPortal({ stats, user, activeTab }) {
 
     const token = localStorage.getItem('alexandria_token');
     try {
-      const res = await fetch(`http://localhost:5000/api/assignments/${selectedAssignment.id}/submit`, {
+      const res = await fetch(`/api/assignments/${selectedAssignment.id}/submit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

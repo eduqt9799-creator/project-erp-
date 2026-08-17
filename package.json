@@ -8,7 +8,14 @@
     "client": "cmd /c npm --prefix client run dev",
     "dev": "concurrently \"npm run server\" \"npm run client\""
   },
-  "keywords": ["erp", "academic-portal", "multi-portal", "sqlite", "express", "react"],
+  "keywords": [
+    "erp",
+    "academic-portal",
+    "multi-portal",
+    "sqlite",
+    "express",
+    "react"
+  ],
   "author": "Alexandria Systems",
   "license": "ISC",
   "dependencies": {
@@ -17,6 +24,7 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.6.2",
     "jsonwebtoken": "^9.0.3",
     "sqlite3": "^6.0.1"
   }

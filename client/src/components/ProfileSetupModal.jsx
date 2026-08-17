@@ -20,7 +20,7 @@ export default function ProfileSetupModal({ user, onProfileUpdated }) {
 
     const token = localStorage.getItem('alexandria_token');
     try {
-      const res = await fetch('http://localhost:5000/api/profile/setup', {
+      const res = await fetch('/api/profile/setup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
