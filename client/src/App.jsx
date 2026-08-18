@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import TopHeader from './components/TopHeader';
-import AuthModal from './components/AuthModal';
+import AuthModal, { getSession, clearSession, updateSessionProfile } from './components/AuthModal';
 import ProfileSetupModal from './components/ProfileSetupModal';
 import StudentPortal from './components/StudentPortal';
 import TeacherPortal from './components/TeacherPortal';
@@ -14,71 +14,23 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [dashboardStats, setDashboardStats] = useState(null);
 
-  // Fetch current logged in user
-  const fetchCurrentUser = async () => {
-    const token = localStorage.getItem('alexandria_token');
-    if (!token) {
-      setCurrentUser(null);
-      setLoadingUser(false);
-      return;
-    }
-
-    try {
-      const res = await fetch('/api/auth/me', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (res.ok && data.user) {
-        setCurrentUser(data.user);
-      } else {
-        localStorage.removeItem('alexandria_token');
-        setCurrentUser(null);
-      }
-    } catch (err) {
-      console.error('Failed to verify token:', err);
-      setCurrentUser(null);
-    } finally {
-      setLoadingUser(false);
-    }
-  };
-
-  // Fetch role & department-specific dashboard data
-  const fetchDashboardStats = async () => {
-    if (!currentUser) return;
-    const token = localStorage.getItem('alexandria_token');
-
-    try {
-      const res = await fetch('/api/dashboard/stats', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setDashboardStats(data);
-      }
-    } catch (err) {
-      console.error('Failed to fetch dashboard stats:', err);
-    }
-  };
-
+  // Load session from localStorage on mount
   useEffect(() => {
-    fetchCurrentUser();
+    const session = getSession();
+    if (session) {
+      setCurrentUser(session);
+    }
+    setLoadingUser(false);
   }, []);
 
-  useEffect(() => {
-    if (currentUser) {
-      fetchDashboardStats();
-    }
-  }, [currentUser]);
-
   const handleLogout = () => {
-    localStorage.removeItem('alexandria_token');
+    clearSession();
     setCurrentUser(null);
     setDashboardStats(null);
   };
 
   const handleProfileUpdated = (updatedUser) => {
     setCurrentUser(updatedUser);
-    fetchDashboardStats();
   };
 
   if (loadingUser) {
@@ -89,10 +41,10 @@ export default function App() {
     );
   }
 
-  // If not logged in, render Auth Modal
+  // If not logged in, render Auth Modal (role-select → register → login)
   if (!currentUser) {
     return (
-      <AuthModal 
+      <AuthModal
         onLoginSuccess={(user) => { setCurrentUser(user); }}
         onRegisterSuccess={(user) => { setCurrentUser(user); }}
       />
@@ -101,19 +53,19 @@ export default function App() {
 
   return (
     <div className="app-container">
-      {/* Off-White Sidebar (Matches Screenshot) */}
-      <Sidebar 
-        currentUser={currentUser} 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
-        onLogout={handleLogout} 
+      {/* Off-White Sidebar */}
+      <Sidebar
+        currentUser={currentUser}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        onLogout={handleLogout}
       />
 
       {/* Main Canvas Area */}
       <main className="main-canvas">
         <TopHeader />
 
-        {/* Dynamic Portal View based on User Role & Department */}
+        {/* Dynamic Portal View based on User Role */}
         {currentUser.role === 'student' && (
           <StudentPortal stats={dashboardStats} user={currentUser} activeTab={activeTab} />
         )}
@@ -130,7 +82,7 @@ export default function App() {
           <AdminPortal stats={dashboardStats} user={currentUser} activeTab={activeTab} />
         )}
 
-        {/* Footer (Matches Screenshot) */}
+        {/* Footer */}
         <footer className="alexandria-footer">
           <div style={{ fontFamily: 'Cinzel, serif', fontWeight: 700, color: '#e6e6e6' }}>Hindusthan CSE Department</div>
           <div className="footer-links">
@@ -144,7 +96,11 @@ export default function App() {
 
       {/* Post-Login Profile Completion Modal */}
       {currentUser.profile_completed === 0 && (
-        <ProfileSetupModal user={currentUser} onProfileUpdated={handleProfileUpdated} />
+        <ProfileSetupModal
+          user={currentUser}
+          onProfileUpdated={handleProfileUpdated}
+          updateSessionProfile={updateSessionProfile}
+        />
       )}
     </div>
   );

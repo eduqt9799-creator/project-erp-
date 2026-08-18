@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { UserCheck } from 'lucide-react';
 
-export default function ProfileSetupModal({ user, onProfileUpdated }) {
+export default function ProfileSetupModal({ user, onProfileUpdated, updateSessionProfile }) {
   const [phone, setPhone] = useState(user.profile?.phone || '');
   const [bio, setBio] = useState(user.profile?.bio || '');
   const [officeRoom, setOfficeRoom] = useState(user.profile?.office_room || '');
@@ -18,29 +18,38 @@ export default function ProfileSetupModal({ user, onProfileUpdated }) {
     setLoading(true);
     setError('');
 
-    const token = localStorage.getItem('alexandria_token');
     try {
+      const profileData = {
+        phone,
+        bio,
+        office_room: officeRoom,
+        roll_number: rollNumber,
+        employee_id: employeeId,
+        batch_year: batchYear,
+        designation,
+        specialization,
+      };
+
+      // If updateSessionProfile helper provided (localStorage mode), use it
+      if (updateSessionProfile) {
+        const updated = updateSessionProfile(profileData);
+        if (updated) {
+          onProfileUpdated(updated);
+        } else {
+          setError('Failed to save profile. Please try again.');
+        }
+        return;
+      }
+
+      // Fallback: API-based save
+      const token = localStorage.getItem('alexandria_token');
       const res = await fetch('/api/profile/setup', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          phone,
-          bio,
-          office_room: officeRoom,
-          roll_number: rollNumber,
-          employee_id: employeeId,
-          batch_year: batchYear,
-          designation,
-          specialization
-        })
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(profileData),
       });
-
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to update profile');
-
       onProfileUpdated(data.user);
     } catch (err) {
       setError(err.message);
