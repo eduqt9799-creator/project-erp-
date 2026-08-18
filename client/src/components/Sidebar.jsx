@@ -17,7 +17,7 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab, onLogout
   return (
     <aside className="alexandria-sidebar">
       <div>
-        <div className="brand-title">Alexandria</div>
+        <div className="brand-title">Hindusthan CSE Department</div>
 
         {/* Profile Card Block (Matches Screenshot) */}
         <div className="profile-card-mini">

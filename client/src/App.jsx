@@ -84,7 +84,7 @@ export default function App() {
   if (loadingUser) {
     return (
       <div style={{ backgroundColor: '#07080a', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontFamily: 'Cinzel, serif', fontSize: '24px' }}>
-        Loading Alexandria Academic Portal...
+        Loading Hindusthan CSE Department Portal...
       </div>
     );
   }
@@ -132,13 +132,13 @@ export default function App() {
 
         {/* Footer (Matches Screenshot) */}
         <footer className="alexandria-footer">
-          <div style={{ fontFamily: 'Cinzel, serif', fontWeight: 700, color: '#e6e6e6' }}>Alexandria</div>
+          <div style={{ fontFamily: 'Cinzel, serif', fontWeight: 700, color: '#e6e6e6' }}>Hindusthan CSE Department</div>
           <div className="footer-links">
             <a href="#integrity" className="footer-link">Academic Integrity</a>
             <a href="#support" className="footer-link">Support</a>
             <a href="#policy" className="footer-link">Institutional Policy</a>
           </div>
-          <div>© 2026 Alexandria Educational Systems. All rights reserved.</div>
+          <div>© 2026 Hindusthan CSE Department. All rights reserved.</div>
         </footer>
       </main>
 

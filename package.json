@@ -2,12 +2,6 @@
   "name": "alexandria-multi-portal-erp",
   "version": "1.0.0",
   "description": "Centralized Multi-Portal ERP System with SQLite Database & Department Isolation",
-  "main": "server/index.js",
-  "scripts": {
-    "server": "node server/index.js",
-    "client": "cmd /c npm --prefix client run dev",
-    "dev": "concurrently \"node server/index.js\" \"cmd /c npm --prefix client run dev\""
-  },
   "keywords": [
     "erp",
     "academic-portal",
@@ -16,8 +10,23 @@
     "express",
     "react"
   ],
-  "author": "Alexandria Systems",
+  "homepage": "https://github.com/eduqt9799-creator/project-erp-#readme",
+  "bugs": {
+    "url": "https://github.com/eduqt9799-creator/project-erp-/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/eduqt9799-creator/project-erp-.git"
+  },
   "license": "ISC",
+  "author": "Alexandria Systems",
+  "type": "commonjs",
+  "main": "server/index.js",
+  "scripts": {
+    "server": "node server/index.js",
+    "client": "cmd /c npm --prefix client run dev",
+    "dev": "concurrently \"node server/index.js\" \"cmd /c npm --prefix client run dev\""
+  },
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "concurrently": "^10.0.5",
@@ -27,5 +36,8 @@
     "express-rate-limit": "^8.6.2",
     "jsonwebtoken": "^9.0.3",
     "sqlite3": "^6.0.1"
+  },
+  "devDependencies": {
+    "vite": "^8.2.1"
   }
 }

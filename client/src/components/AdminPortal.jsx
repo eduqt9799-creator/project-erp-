@@ -117,7 +117,7 @@ export default function AdminPortal({ stats, user, activeTab }) {
         </div>
         <h1 className="welcome-title">Welcome back, Chancellor.</h1>
         <p className="welcome-subtitle">
-          Centralized governance for Alexandria ERP. Oversee departments, manage role authorizations, and maintain institutional integrity.
+          Centralized governance for Hindusthan CSE Department ERP. Oversee departments, manage role authorizations, and maintain institutional integrity.
         </p>
       </div>
 

@@ -84,7 +84,7 @@ export default function AuthModal({ onLoginSuccess, onRegisterSuccess }) {
     <div className="modal-overlay">
       <div className="modal-content" style={{ maxWidth: '540px' }}>
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-          <h1 style={{ fontFamily: 'Cinzel, serif', fontSize: '32px', color: '#0d2847' }}>Alexandria</h1>
+          <h1 style={{ fontFamily: 'Cinzel, serif', fontSize: '28px', color: '#0d2847' }}>Hindusthan CSE Department</h1>
           <p style={{ fontFamily: 'Playfair Display, serif', fontSize: '15px', color: '#555555', marginTop: '4px' }}>
             Centralized Academic Portal ERP
           </p>
@@ -116,7 +116,7 @@ export default function AuthModal({ onLoginSuccess, onRegisterSuccess }) {
             <input 
               type="email" 
               className="input-field" 
-              placeholder="username@alexandria.edu"
+              placeholder="username@hindusthan.edu"
               value={email} 
               onChange={e => setEmail(e.target.value)} 
               required 

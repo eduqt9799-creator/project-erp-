@@ -62,7 +62,7 @@ export default function SettingsTab({ user, onProfileUpdated }) {
           <div>
             <h2 className="card-white-title">Profile & Institutional Account Settings</h2>
             <p style={{ fontSize: '13px', color: '#666' }}>
-              Manage your profile details, contact info, and institutional credentials for {user.dept_name || 'Alexandria ERP'}.
+              Manage your profile details, contact info, and institutional credentials for {user.dept_name || 'Hindusthan CSE Department ERP'}.
             </p>
           </div>
           <span style={{ fontSize: '12px', background: '#eef4fb', color: '#0f4c81', padding: '6px 12px', borderRadius: '6px', fontWeight: 700, textTransform: 'uppercase' }}>
