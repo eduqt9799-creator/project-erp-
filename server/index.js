@@ -17,10 +17,8 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173')
 // MIDDLEWARE
 // ==========================================
 
-// CORS — only allow configured origins
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (Postman, server-to-server)
     if (!origin) return callback(null, true);
     if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
     return callback(new Error(`CORS: Origin ${origin} not allowed`));
@@ -30,10 +28,9 @@ app.use(cors({
 
 app.use(express.json());
 
-// Rate limiting on authentication routes (prevent brute-force)
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20,                   // max 20 attempts per window per IP
+  windowMs: 15 * 60 * 1000,
+  max: 20,
   message: { error: 'Too many authentication attempts. Please try again in 15 minutes.' },
   standardHeaders: true,
   legacyHeaders: false
@@ -71,7 +68,6 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-// Role authorization middleware factory
 const requireRole = (...roles) => (req, res, next) => {
   if (!roles.includes(req.user.role)) {
     return res.status(403).json({ error: `Access denied. Required role: ${roles.join(' or ')}` });
@@ -88,7 +84,6 @@ initSheets().catch(err => console.error('[Sheets] Init error:', err.message));
 // 1. PUBLIC & AUTH ROUTES
 // ==========================================
 
-// Get All Departments (Public — used in registration form)
 app.get('/api/departments', async (req, res) => {
   try {
     const departments = await dbAll('SELECT * FROM departments ORDER BY code ASC');
@@ -98,7 +93,6 @@ app.get('/api/departments', async (req, res) => {
   }
 });
 
-// Register User (with rate limiting)
 app.post('/api/auth/register', authLimiter, async (req, res) => {
   const { name, email, password, role, department_id } = req.body;
 
@@ -146,7 +140,6 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
       [userId]
     );
 
-    // Sync to Google Sheets (fire-and-forget)
     const deptName = newUser?.dept_name || 'N/A';
     appendToSheet(role, [name, email, role, deptName, new Date().toISOString(), 'Self-Registration', '']).catch(() => {});
 
@@ -156,7 +149,6 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
   }
 });
 
-// Login User (with rate limiting)
 app.post('/api/auth/login', authLimiter, async (req, res) => {
   const { email, password } = req.body;
 
@@ -195,7 +187,6 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
   }
 });
 
-// Get Current Logged-in User
 app.get('/api/auth/me', authenticateToken, async (req, res) => {
   try {
     const user = await dbGet(
@@ -217,7 +208,6 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
 // 2. PROFILE ROUTES
 // ==========================================
 
-// Initial Profile Setup (post-registration, profile_completed = 0)
 app.post('/api/profile/setup', authenticateToken, async (req, res) => {
   const { phone, bio, office_room, roll_number, employee_id, batch_year, designation, specialization } = req.body;
   const userId = req.user.id;
@@ -243,19 +233,16 @@ app.post('/api/profile/setup', authenticateToken, async (req, res) => {
   }
 });
 
-// Update Profile (Settings Tab — for already-complete profiles)
 app.put('/api/profile', authenticateToken, async (req, res) => {
   const { phone, bio, office_room, roll_number, employee_id, batch_year, designation, specialization, name } = req.body;
   const userId = req.user.id;
 
   try {
-    // Update profile fields
     await dbRun(
       `UPDATE profiles SET phone = ?, bio = ?, office_room = ?, roll_number = ?, employee_id = ?, batch_year = ?, designation = ?, specialization = ? WHERE user_id = ?`,
       [phone || null, bio || null, office_room || null, roll_number || null, employee_id || null, batch_year || null, designation || null, specialization || null, userId]
     );
 
-    // Update display name if provided
     if (name && name.trim()) {
       await dbRun(`UPDATE users SET name = ? WHERE id = ?`, [name.trim(), userId]);
     }
@@ -399,6 +386,14 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
         [department_id]
       );
 
+      const study_materials = await dbAll(
+        `SELECT sm.*, u.name as uploader_name FROM study_materials sm
+         LEFT JOIN users u ON sm.uploaded_by = u.id
+         WHERE sm.department_id = ?
+         ORDER BY sm.created_at DESC LIMIT 5`,
+        [department_id]
+      );
+
       return res.json({
         role: 'teacher',
         department: dept,
@@ -407,7 +402,8 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
         deptStudents,
         assignments,
         announcements,
-        recentAttendance
+        recentAttendance,
+        study_materials
       });
     }
 
@@ -423,11 +419,6 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
 
       const departmentCourses = enrolledCourses.length > 0 ? enrolledCourses : await dbAll(
         `SELECT c.*, u.name as teacher_name, u.email as teacher_email, u.avatar as teacher_avatar FROM courses c LEFT JOIN users u ON c.teacher_id = u.id WHERE c.department_id = ?`,
-        [department_id]
-      );
-
-      const hod = await dbGet(
-        `SELECT u.name, u.email, u.avatar, p.office_room FROM users u LEFT JOIN profiles p ON u.id = p.user_id WHERE u.department_id = ? AND u.role = 'hod' LIMIT 1`,
         [department_id]
       );
 
@@ -481,11 +472,43 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
         [department_id]
       );
 
+      const study_materials = await dbAll(
+        `SELECT sm.*, u.name as uploader_name FROM study_materials sm
+         LEFT JOIN users u ON sm.uploaded_by = u.id
+         WHERE sm.department_id = ?
+         ORDER BY sm.created_at DESC LIMIT 5`,
+        [department_id]
+      );
+
+      const recentNotifications = await dbAll(
+        `SELECT n.*, u.name as sender_name FROM notifications n
+         LEFT JOIN users u ON n.sender_id = u.id
+         WHERE n.receiver_id = ?
+         ORDER BY n.created_at DESC LIMIT 10`,
+        [userId]
+      );
+
+      const unreadNotificationCount = await dbGet(
+        `SELECT COUNT(*) as count FROM notifications WHERE receiver_id = ? AND is_read = 0`,
+        [userId]
+      );
+
+      const timetable = await dbAll(
+        `SELECT t.*, c.code as course_code, c.name as course_name
+         FROM timetables t
+         JOIN courses c ON t.course_id = c.id
+         WHERE t.department_id = ?
+         ORDER BY CASE t.day_of_week
+           WHEN 'Monday' THEN 1 WHEN 'Tuesday' THEN 2 WHEN 'Wednesday' THEN 3
+           WHEN 'Thursday' THEN 4 WHEN 'Friday' THEN 5 WHEN 'Saturday' THEN 6 WHEN 'Sunday' THEN 7
+         END, t.start_time ASC`,
+        [department_id]
+      );
+
       return res.json({
         role: 'student',
         department: dept,
         enrolledCourses: departmentCourses,
-        hod,
         assignments,
         attendanceRecords,
         courseAttendanceBreakdown,
@@ -494,7 +517,11 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
         totalPresent,
         grades,
         announcements,
-        teachersList
+        teachersList,
+        study_materials,
+        notifications: recentNotifications,
+        unread_count: unreadNotificationCount?.count || 0,
+        timetable
       });
     }
 
@@ -508,7 +535,6 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
 // 4. COURSES API
 // ==========================================
 
-// Get Courses
 app.get('/api/courses', authenticateToken, async (req, res) => {
   const { department_id, role } = req.user;
   try {
@@ -524,7 +550,6 @@ app.get('/api/courses', authenticateToken, async (req, res) => {
   }
 });
 
-// Create Course (HOD or Admin)
 app.post('/api/courses', authenticateToken, requireRole('hod', 'admin'), async (req, res) => {
   const { code, name, credits, semester, teacher_id, department_id } = req.body;
 
@@ -542,7 +567,7 @@ app.post('/api/courses', authenticateToken, requireRole('hod', 'admin'), async (
 
     const result = await dbRun(
       `INSERT INTO courses (code, name, department_id, teacher_id, credits, semester) VALUES (?, ?, ?, ?, ?, ?)`,
-      [code, name, deptId, teacher_id || null, credits || 3, semester || 'Fall 2026']
+      [code, name, deptId, teacher_id || null, credits || 3, semester || null]
     );
     res.status(201).json({ id: result.lastID, message: 'Course created successfully' });
   } catch (err) {
@@ -550,7 +575,6 @@ app.post('/api/courses', authenticateToken, requireRole('hod', 'admin'), async (
   }
 });
 
-// Delete Course (HOD or Admin)
 app.delete('/api/courses/:id', authenticateToken, requireRole('hod', 'admin'), async (req, res) => {
   const courseId = req.params.id;
   const { role, department_id } = req.user;
@@ -559,7 +583,6 @@ app.delete('/api/courses/:id', authenticateToken, requireRole('hod', 'admin'), a
     const course = await dbGet('SELECT * FROM courses WHERE id = ?', [courseId]);
     if (!course) return res.status(404).json({ error: 'Course not found' });
 
-    // HOD can only delete courses in their own department
     if (role === 'hod' && course.department_id !== department_id) {
       return res.status(403).json({ error: 'You can only delete courses in your department' });
     }
@@ -571,7 +594,6 @@ app.delete('/api/courses/:id', authenticateToken, requireRole('hod', 'admin'), a
   }
 });
 
-// Assign Teacher to Course (HOD or Admin)
 app.post('/api/courses/assign', authenticateToken, requireRole('hod', 'admin', 'teacher'), async (req, res) => {
   const { course_id, teacher_id } = req.body;
   if (!course_id || !teacher_id) {
@@ -585,7 +607,6 @@ app.post('/api/courses/assign', authenticateToken, requireRole('hod', 'admin', '
   }
 });
 
-// Enroll Student in Course
 app.post('/api/courses/:id/enroll', authenticateToken, requireRole('hod', 'admin'), async (req, res) => {
   const course_id = req.params.id;
   const { student_id } = req.body;
@@ -606,7 +627,6 @@ app.post('/api/courses/:id/enroll', authenticateToken, requireRole('hod', 'admin
 // 5. ASSIGNMENTS API
 // ==========================================
 
-// Get Assignments
 app.get('/api/assignments', authenticateToken, async (req, res) => {
   const { department_id, role } = req.user;
   try {
@@ -622,7 +642,6 @@ app.get('/api/assignments', authenticateToken, async (req, res) => {
   }
 });
 
-// Create Assignment (Teacher, HOD, Admin)
 app.post('/api/assignments', authenticateToken, requireRole('teacher', 'hod', 'admin'), async (req, res) => {
   const { course_id, title, description, due_date, max_marks } = req.body;
 
@@ -641,7 +660,6 @@ app.post('/api/assignments', authenticateToken, requireRole('teacher', 'hod', 'a
   }
 });
 
-// Delete Assignment (Teacher, HOD, Admin)
 app.delete('/api/assignments/:id', authenticateToken, requireRole('teacher', 'hod', 'admin'), async (req, res) => {
   try {
     const assignment = await dbGet('SELECT id FROM assignments WHERE id = ?', [req.params.id]);
@@ -658,7 +676,6 @@ app.delete('/api/assignments/:id', authenticateToken, requireRole('teacher', 'ho
 // 6. SUBMISSIONS API
 // ==========================================
 
-// Student submits an assignment
 app.post('/api/assignments/:id/submit', authenticateToken, requireRole('student'), async (req, res) => {
   const assignmentId = req.params.id;
   const studentId = req.user.id;
@@ -672,10 +689,8 @@ app.post('/api/assignments/:id/submit', authenticateToken, requireRole('student'
     const assignment = await dbGet('SELECT id FROM assignments WHERE id = ?', [assignmentId]);
     if (!assignment) return res.status(404).json({ error: 'Assignment not found' });
 
-    // Check for duplicate submission
     const existing = await dbGet('SELECT id FROM submissions WHERE assignment_id = ? AND student_id = ?', [assignmentId, studentId]);
     if (existing) {
-      // Update instead of insert
       await dbRun(
         `UPDATE submissions SET submission_text = ?, file_url = ?, submitted_at = CURRENT_TIMESTAMP WHERE id = ?`,
         [submission_text || '', file_url || '', existing.id]
@@ -693,7 +708,6 @@ app.post('/api/assignments/:id/submit', authenticateToken, requireRole('student'
   }
 });
 
-// Teacher/HOD fetches submissions for their department assignments
 app.get('/api/submissions', authenticateToken, requireRole('teacher', 'hod', 'admin'), async (req, res) => {
   const { department_id, role } = req.user;
   const { assignment_id } = req.query;
@@ -742,7 +756,6 @@ app.get('/api/submissions', authenticateToken, requireRole('teacher', 'hod', 'ad
   }
 });
 
-// Grade a Submission (Teacher, HOD, Admin)
 app.post('/api/submissions/:id/grade', authenticateToken, requireRole('teacher', 'hod', 'admin'), async (req, res) => {
   const submissionId = req.params.id;
   const { marks_obtained, feedback } = req.body;
@@ -769,7 +782,6 @@ app.post('/api/submissions/:id/grade', authenticateToken, requireRole('teacher',
 // 7. GRADES API
 // ==========================================
 
-// Get grades
 app.get('/api/grades', authenticateToken, async (req, res) => {
   const { role, department_id, id: userId } = req.user;
   const { student_id } = req.query;
@@ -793,7 +805,6 @@ app.get('/api/grades', authenticateToken, async (req, res) => {
         );
       }
     } else {
-      // Teacher or HOD — fetch grades for all students in their department
       grades = await dbAll(
         `SELECT g.*, c.name as course_name, c.code as course_code, u.name as student_name, p.roll_number
          FROM grades g
@@ -811,7 +822,6 @@ app.get('/api/grades', authenticateToken, async (req, res) => {
   }
 });
 
-// Create or Update a Grade entry (Teacher, HOD, Admin)
 app.post('/api/grades', authenticateToken, requireRole('teacher', 'hod', 'admin'), async (req, res) => {
   const { student_id, course_id, grade, exam_type, score } = req.body;
 
@@ -844,7 +854,6 @@ app.post('/api/grades', authenticateToken, requireRole('teacher', 'hod', 'admin'
 // 8. ANNOUNCEMENTS API
 // ==========================================
 
-// Get Announcements
 app.get('/api/announcements', authenticateToken, async (req, res) => {
   const { department_id, role } = req.user;
   try {
@@ -865,9 +874,8 @@ app.get('/api/announcements', authenticateToken, async (req, res) => {
   }
 });
 
-// Create Announcement (Teacher, HOD, Admin)
 app.post('/api/announcements', authenticateToken, requireRole('teacher', 'hod', 'admin'), async (req, res) => {
-  const { title, content, target_role, department_id } = req.body;
+  const { title, content, target_role, department_id, academic_year } = req.body;
   const deptId = req.user.role === 'admin' ? (department_id || req.user.department_id) : req.user.department_id;
   const authorId = req.user.id;
 
@@ -877,8 +885,8 @@ app.post('/api/announcements', authenticateToken, requireRole('teacher', 'hod', 
 
   try {
     const result = await dbRun(
-      `INSERT INTO announcements (department_id, author_id, title, content, target_role) VALUES (?, ?, ?, ?, ?)`,
-      [deptId, authorId, title, content, target_role || 'all']
+      `INSERT INTO announcements (department_id, author_id, title, content, target_role, academic_year) VALUES (?, ?, ?, ?, ?, ?)`,
+      [deptId, authorId, title, content, target_role || 'all', academic_year || null]
     );
     res.status(201).json({ id: result.lastID, message: 'Announcement broadcasted successfully' });
   } catch (err) {
@@ -886,7 +894,6 @@ app.post('/api/announcements', authenticateToken, requireRole('teacher', 'hod', 
   }
 });
 
-// Edit Announcement (HOD, Admin)
 app.put('/api/announcements/:id', authenticateToken, requireRole('hod', 'admin'), async (req, res) => {
   const { role, department_id } = req.user;
   const { title, content, target_role } = req.body;
@@ -913,7 +920,6 @@ app.put('/api/announcements/:id', authenticateToken, requireRole('hod', 'admin')
   }
 });
 
-// Delete Announcement (HOD, Admin — own department only for HOD)
 app.delete('/api/announcements/:id', authenticateToken, requireRole('hod', 'admin'), async (req, res) => {
   const { role, department_id } = req.user;
   try {
@@ -932,10 +938,9 @@ app.delete('/api/announcements/:id', authenticateToken, requireRole('hod', 'admi
 });
 
 // ==========================================
-// HOD FACULTY / PROFESSOR MANAGEMENT API
+// 9. HOD FACULTY MANAGEMENT API
 // ==========================================
 
-// HOD Add Faculty / Teacher Account
 app.post('/api/hod/teachers', authenticateToken, requireRole('hod', 'admin'), async (req, res) => {
   const { name, email, password, employee_id, designation, specialization, office_room, phone } = req.body;
   const deptId = req.user.department_id;
@@ -965,7 +970,6 @@ app.post('/api/hod/teachers', authenticateToken, requireRole('hod', 'admin'), as
       [userId, employee_id || `EMP-CSE-${userId}`, designation || 'Associate Professor', specialization || 'Computer Science', office_room || 'Turing Hall', phone || null]
     );
 
-    // Sync to Google Sheets (fire-and-forget)
     const hodDept = await dbGet('SELECT name FROM departments WHERE id = ?', [deptId]).catch(() => null);
     const hodExtra = `Emp ID: ${employee_id || `EMP-CSE-${userId}`}, Designation: ${designation || 'Associate Professor'}, Specialization: ${specialization || 'Computer Science'}`;
     appendToSheet('teacher', [name, email, 'teacher', hodDept?.name || 'N/A', new Date().toISOString(), 'HOD-Created', hodExtra]).catch(() => {});
@@ -976,7 +980,6 @@ app.post('/api/hod/teachers', authenticateToken, requireRole('hod', 'admin'), as
   }
 });
 
-// HOD Edit Faculty Details
 app.put('/api/hod/teachers/:id', authenticateToken, requireRole('hod', 'admin'), async (req, res) => {
   const targetId = parseInt(req.params.id);
   const deptId = req.user.department_id;
@@ -1001,7 +1004,6 @@ app.put('/api/hod/teachers/:id', authenticateToken, requireRole('hod', 'admin'),
   }
 });
 
-// HOD Delete Faculty Member
 app.delete('/api/hod/teachers/:id', authenticateToken, requireRole('hod', 'admin'), async (req, res) => {
   const targetId = parseInt(req.params.id);
   const deptId = req.user.department_id;
@@ -1021,10 +1023,9 @@ app.delete('/api/hod/teachers/:id', authenticateToken, requireRole('hod', 'admin
 });
 
 // ==========================================
-// 9. ATTENDANCE API
+// 10. ATTENDANCE API
 // ==========================================
 
-// Get Attendance (with filters)
 app.get('/api/attendance', authenticateToken, async (req, res) => {
   const { role, department_id, id: userId } = req.user;
   const { course_id, student_id, date } = req.query;
@@ -1060,7 +1061,27 @@ app.get('/api/attendance', authenticateToken, async (req, res) => {
   }
 });
 
-// Bulk Mark Attendance (Teacher, HOD)
+app.post('/api/attendance', authenticateToken, requireRole('teacher', 'hod', 'admin'), async (req, res) => {
+  const { course_id, student_id, date, status } = req.body;
+  const validStatuses = ['present', 'absent', 'late'];
+
+  if (!course_id || !student_id || !date || !validStatuses.includes(status)) {
+    return res.status(400).json({ error: 'Invalid attendance data. Status must be: present, absent, or late' });
+  }
+
+  try {
+    await dbRun(
+      `INSERT INTO attendance (course_id, student_id, date, status)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(course_id, student_id, date) DO UPDATE SET status = excluded.status`,
+      [course_id, student_id, date, status]
+    );
+    res.json({ message: 'Attendance recorded successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to record attendance' });
+  }
+});
+
 app.post('/api/attendance/bulk', authenticateToken, requireRole('teacher', 'hod', 'admin'), async (req, res) => {
   const { course_id, date, records } = req.body;
 
@@ -1086,33 +1107,10 @@ app.post('/api/attendance/bulk', authenticateToken, requireRole('teacher', 'hod'
   }
 });
 
-// Single Attendance Mark
-app.post('/api/attendance', authenticateToken, requireRole('teacher', 'hod', 'admin'), async (req, res) => {
-  const { course_id, student_id, date, status } = req.body;
-  const validStatuses = ['present', 'absent', 'late'];
-
-  if (!course_id || !student_id || !date || !validStatuses.includes(status)) {
-    return res.status(400).json({ error: 'Invalid attendance data. Status must be: present, absent, or late' });
-  }
-
-  try {
-    await dbRun(
-      `INSERT INTO attendance (course_id, student_id, date, status)
-       VALUES (?, ?, ?, ?)
-       ON CONFLICT(course_id, student_id, date) DO UPDATE SET status = excluded.status`,
-      [course_id, student_id, date, status]
-    );
-    res.json({ message: 'Attendance recorded successfully' });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to record attendance' });
-  }
-});
-
 // ==========================================
-// 10. USER MANAGEMENT API
+// 11. USER MANAGEMENT API
 // ==========================================
 
-// Get All Users (Admin = all, others = own department)
 app.get('/api/users', authenticateToken, async (req, res) => {
   const { role, department_id } = req.user;
 
@@ -1145,7 +1143,6 @@ app.get('/api/users', authenticateToken, async (req, res) => {
   }
 });
 
-// Admin Create User
 app.post('/api/admin/users', authenticateToken, requireRole('admin'), async (req, res) => {
   const { name, email, password, role, department_id, roll_number, employee_id, designation, batch_year, academic_year } = req.body;
 
@@ -1184,7 +1181,6 @@ app.post('/api/admin/users', authenticateToken, requireRole('admin'), async (req
       [userId, roll_number || null, employee_id || null, designation || null, batch_year || (academic_year === 2 ? '2024 - 2028' : '2025 - 2029'), Number(academic_year || 1)]
     );
 
-    // Sync to Google Sheets (fire-and-forget)
     const adminDept = await dbGet('SELECT name FROM departments WHERE id = ?', [department_id]).catch(() => null);
     const extraInfo = role === 'student' ? `Roll: ${roll_number || 'N/A'}, Batch: ${batch_year || 'N/A'}` : `Emp ID: ${employee_id || 'N/A'}, Designation: ${designation || 'N/A'}`;
     appendToSheet(role, [name, email, role, adminDept?.name || 'N/A', new Date().toISOString(), 'Admin-Created', extraInfo]).catch(() => {});
@@ -1195,7 +1191,6 @@ app.post('/api/admin/users', authenticateToken, requireRole('admin'), async (req
   }
 });
 
-// Admin Delete User (cannot delete own account)
 app.delete('/api/admin/users/:id', authenticateToken, requireRole('admin'), async (req, res) => {
   const targetId = parseInt(req.params.id);
 
@@ -1211,7 +1206,6 @@ app.delete('/api/admin/users/:id', authenticateToken, requireRole('admin'), asyn
       return res.status(403).json({ error: 'Cannot delete admin accounts through this interface' });
     }
 
-    // Cascade: delete related data
     await dbRun('DELETE FROM profiles WHERE user_id = ?', [targetId]);
     await dbRun('DELETE FROM enrollments WHERE student_id = ?', [targetId]);
     await dbRun('DELETE FROM attendance WHERE student_id = ?', [targetId]);
@@ -1226,25 +1220,790 @@ app.delete('/api/admin/users/:id', authenticateToken, requireRole('admin'), asyn
 });
 
 // ==========================================
-// GLOBAL ERROR HANDLER
+// 12. STUDY MATERIALS API
 // ==========================================
 
-// Handle 404 for unknown API routes
-app.use('/api/*splat', (req, res) => {
-  res.status(404).json({ error: `API endpoint ${req.method} ${req.path} not found` });
+app.get('/api/study-materials', authenticateToken, async (req, res) => {
+  const { department_id, role } = req.user;
+  const { semester, academic_year, file_type, search } = req.query;
+
+  try {
+    let sql, params;
+
+    if (role === 'admin') {
+      sql = `SELECT sm.*, u.name as uploader_name, d.code as dept_code
+             FROM study_materials sm
+             LEFT JOIN users u ON sm.uploaded_by = u.id
+             LEFT JOIN departments d ON sm.department_id = d.id
+             WHERE 1=1`;
+      params = [];
+    } else {
+      sql = `SELECT sm.*, u.name as uploader_name
+             FROM study_materials sm
+             LEFT JOIN users u ON sm.uploaded_by = u.id
+             WHERE sm.department_id = ?`;
+      params = [department_id];
+    }
+
+    if (semester) { sql += ' AND sm.semester = ?'; params.push(semester); }
+    if (academic_year) { sql += ' AND sm.academic_year = ?'; params.push(academic_year); }
+    if (file_type) { sql += ' AND sm.file_type = ?'; params.push(file_type); }
+    if (search) { sql += ' AND (sm.title LIKE ? OR sm.description LIKE ?)'; params.push(`%${search}%`, `%${search}%`); }
+
+    sql += ' ORDER BY sm.created_at DESC';
+
+    const materials = await dbAll(sql, params);
+    res.json(materials);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch study materials' });
+  }
+});
+
+app.post('/api/study-materials', authenticateToken, requireRole('teacher', 'hod', 'admin'), async (req, res) => {
+  const { title, description, file_type, file_url, file_name, semester, academic_year, subject_id } = req.body;
+  const deptId = req.user.department_id;
+  const uploadedBy = req.user.id;
+
+  if (!title) {
+    return res.status(400).json({ error: 'Title is required' });
+  }
+
+  const validFileTypes = ['notes', 'pdf', 'ppt', 'doc', 'video', 'image', 'zip'];
+  if (file_type && !validFileTypes.includes(file_type)) {
+    return res.status(400).json({ error: `Invalid file_type. Must be one of: ${validFileTypes.join(', ')}` });
+  }
+
+  try {
+    const result = await dbRun(
+      `INSERT INTO study_materials (department_id, uploaded_by, subject_id, title, description, file_type, file_url, file_name, semester, academic_year)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [deptId, uploadedBy, subject_id || null, title, description || null, file_type || null, file_url || null, file_name || null, semester || null, academic_year || null]
+    );
+    res.status(201).json({ id: result.lastID, message: 'Study material uploaded successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to upload study material' });
+  }
+});
+
+app.delete('/api/study-materials/:id', authenticateToken, requireRole('teacher', 'hod', 'admin'), async (req, res) => {
+  const materialId = parseInt(req.params.id);
+  const { role, department_id, id: userId } = req.user;
+
+  try {
+    const material = await dbGet('SELECT * FROM study_materials WHERE id = ?', [materialId]);
+    if (!material) return res.status(404).json({ error: 'Study material not found' });
+
+    if (role === 'teacher' && material.uploaded_by !== userId) {
+      return res.status(403).json({ error: 'You can only delete materials you uploaded' });
+    }
+
+    if (role === 'hod' && material.department_id !== department_id) {
+      return res.status(403).json({ error: 'You can only delete materials in your department' });
+    }
+
+    await dbRun('DELETE FROM study_materials WHERE id = ?', [materialId]);
+    res.json({ message: 'Study material deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete study material' });
+  }
 });
 
 // ==========================================
-// GOOGLE SHEETS ENDPOINTS
+// 13. NOTIFICATIONS API
 // ==========================================
 
-// Get all registration sheet URLs
+app.get('/api/notifications', authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  const { unread } = req.query;
+
+  try {
+    let sql = `SELECT n.*, u.name as sender_name
+               FROM notifications n
+               LEFT JOIN users u ON n.sender_id = u.id
+               WHERE n.receiver_id = ?`;
+    const params = [userId];
+
+    if (unread === 'true') {
+      sql += ' AND n.is_read = 0';
+    }
+
+    sql += ' ORDER BY n.created_at DESC';
+
+    const notifications = await dbAll(sql, params);
+
+    const unreadCount = await dbGet(
+      'SELECT COUNT(*) as count FROM notifications WHERE receiver_id = ? AND is_read = 0',
+      [userId]
+    );
+
+    res.json({ notifications, unread_count: unreadCount?.count || 0 });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch notifications' });
+  }
+});
+
+app.post('/api/notifications', authenticateToken, requireRole('teacher', 'hod', 'admin'), async (req, res) => {
+  const { receiver_id, title, message, type } = req.body;
+  const sender_id = req.user.id;
+
+  if (!receiver_id || !title || !message) {
+    return res.status(400).json({ error: 'receiver_id, title, and message are required' });
+  }
+
+  const validTypes = ['notification', 'announcement', 'system'];
+  if (type && !validTypes.includes(type)) {
+    return res.status(400).json({ error: `Invalid type. Must be one of: ${validTypes.join(', ')}` });
+  }
+
+  try {
+    const result = await dbRun(
+      `INSERT INTO notifications (sender_id, receiver_id, title, message, type) VALUES (?, ?, ?, ?, ?)`,
+      [sender_id, receiver_id, title, message, type || 'notification']
+    );
+    res.status(201).json({ id: result.lastID, message: 'Notification sent successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to send notification' });
+  }
+});
+
+app.put('/api/notifications/:id/read', authenticateToken, async (req, res) => {
+  const notifId = parseInt(req.params.id);
+  const userId = req.user.id;
+
+  try {
+    const notif = await dbGet('SELECT * FROM notifications WHERE id = ?', [notifId]);
+    if (!notif) return res.status(404).json({ error: 'Notification not found' });
+
+    if (notif.receiver_id !== userId) {
+      return res.status(403).json({ error: 'You can only mark your own notifications as read' });
+    }
+
+    await dbRun('UPDATE notifications SET is_read = 1 WHERE id = ?', [notifId]);
+    res.json({ message: 'Notification marked as read' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to mark notification as read' });
+  }
+});
+
+app.put('/api/notifications/read-all', authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+
+  try {
+    await dbRun('UPDATE notifications SET is_read = 1 WHERE receiver_id = ? AND is_read = 0', [userId]);
+    res.json({ message: 'All notifications marked as read' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to mark notifications as read' });
+  }
+});
+
+app.delete('/api/notifications/:id', authenticateToken, async (req, res) => {
+  const notifId = parseInt(req.params.id);
+  const userId = req.user.id;
+
+  try {
+    const notif = await dbGet('SELECT * FROM notifications WHERE id = ?', [notifId]);
+    if (!notif) return res.status(404).json({ error: 'Notification not found' });
+
+    if (notif.receiver_id !== userId) {
+      return res.status(403).json({ error: 'You can only delete your own notifications' });
+    }
+
+    await dbRun('DELETE FROM notifications WHERE id = ?', [notifId]);
+    res.json({ message: 'Notification deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete notification' });
+  }
+});
+
+// ==========================================
+// 14. CHAT API
+// ==========================================
+
+app.get('/api/chat/conversations', authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+
+  try {
+    const conversations = await dbAll(
+      `SELECT
+         CASE WHEN cm.sender_id = ? THEN cm.receiver_id ELSE cm.sender_id END as other_user_id,
+         u.name as other_user_name,
+         u.avatar as other_user_avatar,
+         u.role as other_user_role,
+         cm.message as last_message,
+         cm.created_at as last_message_at,
+         (SELECT COUNT(*) FROM chat_messages cm2
+          WHERE cm2.sender_id = cm2.sender_id AND cm2.is_read = 0
+            AND ((cm2.sender_id = CASE WHEN cm.sender_id = ? THEN cm.receiver_id ELSE cm.sender_id END) AND cm2.receiver_id = ?)
+         ) as unread_count
+       FROM chat_messages cm
+       JOIN users u ON u.id = CASE WHEN cm.sender_id = ? THEN cm.receiver_id ELSE cm.sender_id END
+       WHERE cm.sender_id = ? OR cm.receiver_id = ?
+       GROUP BY other_user_id
+       ORDER BY last_message_at DESC`,
+      [userId, userId, userId, userId, userId, userId]
+    );
+
+    const result = await Promise.all(conversations.map(async (conv) => {
+      const unread = await dbGet(
+        `SELECT COUNT(*) as count FROM chat_messages
+         WHERE sender_id = ? AND receiver_id = ? AND is_read = 0`,
+        [conv.other_user_id, userId]
+      );
+      return { ...conv, unread_count: unread?.count || 0 };
+    }));
+
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch conversations' });
+  }
+});
+
+app.get('/api/chat/messages/:userId', authenticateToken, async (req, res) => {
+  const currentUserId = req.user.id;
+  const otherUserId = parseInt(req.params.userId);
+
+  try {
+    const messages = await dbAll(
+      `SELECT cm.*, u.name as sender_name
+       FROM chat_messages cm
+       JOIN users u ON cm.sender_id = u.id
+       WHERE (cm.sender_id = ? AND cm.receiver_id = ?)
+          OR (cm.sender_id = ? AND cm.receiver_id = ?)
+       ORDER BY cm.created_at ASC`,
+      [currentUserId, otherUserId, otherUserId, currentUserId]
+    );
+
+    await dbRun(
+      `UPDATE chat_messages SET is_read = 1 WHERE sender_id = ? AND receiver_id = ? AND is_read = 0`,
+      [otherUserId, currentUserId]
+    );
+
+    res.json(messages);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch messages' });
+  }
+});
+
+app.post('/api/chat/messages', authenticateToken, async (req, res) => {
+  const sender_id = req.user.id;
+  const { receiver_id, message } = req.body;
+
+  if (!receiver_id || !message || !message.trim()) {
+    return res.status(400).json({ error: 'receiver_id and message are required' });
+  }
+
+  try {
+    const receiver = await dbGet('SELECT id FROM users WHERE id = ?', [receiver_id]);
+    if (!receiver) return res.status(404).json({ error: 'Recipient user not found' });
+
+    const result = await dbRun(
+      `INSERT INTO chat_messages (sender_id, receiver_id, message) VALUES (?, ?, ?)`,
+      [sender_id, receiver_id, message.trim()]
+    );
+
+    const newMsg = await dbGet('SELECT cm.*, u.name as sender_name FROM chat_messages cm JOIN users u ON cm.sender_id = u.id WHERE cm.id = ?', [result.lastID]);
+    res.status(201).json(newMsg);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to send message' });
+  }
+});
+
+app.get('/api/chat/unread-count', authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+
+  try {
+    const result = await dbGet(
+      'SELECT COUNT(*) as count FROM chat_messages WHERE receiver_id = ? AND is_read = 0',
+      [userId]
+    );
+    res.json({ unread_count: result?.count || 0 });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch unread count' });
+  }
+});
+
+// ==========================================
+// 15. DISCUSSION FORUM API
+// ==========================================
+
+app.get('/api/discussions', authenticateToken, async (req, res) => {
+  const { department_id } = req.user;
+
+  try {
+    const discussions = await dbAll(
+      `SELECT d.*, u.name as author_name, u.avatar as author_avatar,
+              (SELECT COUNT(*) FROM discussion_replies dr WHERE dr.discussion_id = d.id) as reply_count
+       FROM discussions d
+       LEFT JOIN users u ON d.author_id = u.id
+       WHERE d.department_id = ?
+       ORDER BY d.created_at DESC`,
+      [department_id]
+    );
+    res.json(discussions);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch discussions' });
+  }
+});
+
+app.post('/api/discussions', authenticateToken, async (req, res) => {
+  const { title, content } = req.body;
+  const author_id = req.user.id;
+  const department_id = req.user.department_id;
+
+  if (!title || !content) {
+    return res.status(400).json({ error: 'Title and content are required' });
+  }
+
+  try {
+    const result = await dbRun(
+      `INSERT INTO discussions (author_id, department_id, title, content) VALUES (?, ?, ?, ?)`,
+      [author_id, department_id, title, content]
+    );
+    res.status(201).json({ id: result.lastID, message: 'Discussion created successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to create discussion' });
+  }
+});
+
+app.get('/api/discussions/:id', authenticateToken, async (req, res) => {
+  const discussionId = parseInt(req.params.id);
+
+  try {
+    const discussion = await dbGet(
+      `SELECT d.*, u.name as author_name, u.avatar as author_avatar
+       FROM discussions d
+       LEFT JOIN users u ON d.author_id = u.id
+       WHERE d.id = ?`,
+      [discussionId]
+    );
+    if (!discussion) return res.status(404).json({ error: 'Discussion not found' });
+
+    const replies = await dbAll(
+      `SELECT dr.*, u.name as author_name, u.avatar as author_avatar
+       FROM discussion_replies dr
+       LEFT JOIN users u ON dr.author_id = u.id
+       WHERE dr.discussion_id = ?
+       ORDER BY dr.created_at ASC`,
+      [discussionId]
+    );
+
+    res.json({ ...discussion, replies });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch discussion' });
+  }
+});
+
+app.post('/api/discussions/:id/replies', authenticateToken, async (req, res) => {
+  const discussionId = parseInt(req.params.id);
+  const { content } = req.body;
+  const author_id = req.user.id;
+
+  if (!content || !content.trim()) {
+    return res.status(400).json({ error: 'Content is required' });
+  }
+
+  try {
+    const discussion = await dbGet('SELECT id FROM discussions WHERE id = ?', [discussionId]);
+    if (!discussion) return res.status(404).json({ error: 'Discussion not found' });
+
+    const result = await dbRun(
+      `INSERT INTO discussion_replies (discussion_id, author_id, content) VALUES (?, ?, ?)`,
+      [discussionId, author_id, content.trim()]
+    );
+
+    const reply = await dbGet(
+      `SELECT dr.*, u.name as author_name, u.avatar as author_avatar
+       FROM discussion_replies dr LEFT JOIN users u ON dr.author_id = u.id
+       WHERE dr.id = ?`,
+      [result.lastID]
+    );
+
+    res.status(201).json(reply);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to post reply' });
+  }
+});
+
+app.delete('/api/discussions/:id', authenticateToken, async (req, res) => {
+  const discussionId = parseInt(req.params.id);
+  const { role, department_id, id: userId } = req.user;
+
+  try {
+    const discussion = await dbGet('SELECT * FROM discussions WHERE id = ?', [discussionId]);
+    if (!discussion) return res.status(404).json({ error: 'Discussion not found' });
+
+    if (role === 'student' && discussion.author_id !== userId) {
+      return res.status(403).json({ error: 'You can only delete your own discussions' });
+    }
+
+    if (role === 'hod' && discussion.department_id !== department_id) {
+      return res.status(403).json({ error: 'You can only delete discussions in your department' });
+    }
+
+    await dbRun('DELETE FROM discussion_replies WHERE discussion_id = ?', [discussionId]);
+    await dbRun('DELETE FROM discussions WHERE id = ?', [discussionId]);
+    res.json({ message: 'Discussion deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete discussion' });
+  }
+});
+
+// ==========================================
+// 16. TIMETABLE API
+// ==========================================
+
+app.get('/api/timetable', authenticateToken, async (req, res) => {
+  const { department_id, role } = req.user;
+  const { academic_year } = req.query;
+
+  try {
+    let sql, params;
+
+    if (role === 'admin') {
+      sql = `SELECT t.*, c.code as course_code, c.name as course_name, d.code as dept_code
+             FROM timetables t
+             JOIN courses c ON t.course_id = c.id
+             LEFT JOIN departments d ON t.department_id = d.id
+             WHERE 1=1`;
+      params = [];
+    } else {
+      sql = `SELECT t.*, c.code as course_code, c.name as course_name
+             FROM timetables t
+             JOIN courses c ON t.course_id = c.id
+             WHERE t.department_id = ?`;
+      params = [department_id];
+    }
+
+    if (academic_year) { sql += ' AND t.academic_year = ?'; params.push(academic_year); }
+
+    sql += ` ORDER BY CASE t.day_of_week
+      WHEN 'Monday' THEN 1 WHEN 'Tuesday' THEN 2 WHEN 'Wednesday' THEN 3
+      WHEN 'Thursday' THEN 4 WHEN 'Friday' THEN 5 WHEN 'Saturday' THEN 6 WHEN 'Sunday' THEN 7
+    END, t.start_time ASC`;
+
+    const entries = await dbAll(sql, params);
+    res.json(entries);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch timetable' });
+  }
+});
+
+app.post('/api/timetable', authenticateToken, requireRole('hod', 'admin'), async (req, res) => {
+  const { course_id, day_of_week, start_time, end_time, room, academic_year } = req.body;
+  const deptId = req.user.department_id;
+
+  if (!course_id || !day_of_week || !start_time || !end_time) {
+    return res.status(400).json({ error: 'course_id, day_of_week, start_time, and end_time are required' });
+  }
+
+  const validDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  if (!validDays.includes(day_of_week)) {
+    return res.status(400).json({ error: `Invalid day_of_week. Must be one of: ${validDays.join(', ')}` });
+  }
+
+  try {
+    const result = await dbRun(
+      `INSERT INTO timetables (course_id, department_id, day_of_week, start_time, end_time, room, academic_year)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [course_id, deptId, day_of_week, start_time, end_time, room || null, academic_year || null]
+    );
+    res.status(201).json({ id: result.lastID, message: 'Timetable entry created successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to create timetable entry' });
+  }
+});
+
+app.delete('/api/timetable/:id', authenticateToken, requireRole('hod', 'admin'), async (req, res) => {
+  const entryId = parseInt(req.params.id);
+  const { role, department_id } = req.user;
+
+  try {
+    const entry = await dbGet('SELECT * FROM timetables WHERE id = ?', [entryId]);
+    if (!entry) return res.status(404).json({ error: 'Timetable entry not found' });
+
+    if (role === 'hod' && entry.department_id !== department_id) {
+      return res.status(403).json({ error: 'You can only delete timetable entries in your department' });
+    }
+
+    await dbRun('DELETE FROM timetables WHERE id = ?', [entryId]);
+    res.json({ message: 'Timetable entry deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete timetable entry' });
+  }
+});
+
+// ==========================================
+// 17. EXAMS API
+// ==========================================
+
+app.get('/api/exams', authenticateToken, async (req, res) => {
+  const { department_id, role } = req.user;
+  const { semester, exam_type } = req.query;
+
+  try {
+    let sql, params;
+
+    if (role === 'admin') {
+      sql = `SELECT e.*, c.code as course_code, c.name as course_name, d.code as dept_code
+             FROM exams e
+             JOIN courses c ON e.course_id = c.id
+             LEFT JOIN departments d ON e.department_id = d.id
+             WHERE 1=1`;
+      params = [];
+    } else {
+      sql = `SELECT e.*, c.code as course_code, c.name as course_name
+             FROM exams e
+             JOIN courses c ON e.course_id = c.id
+             WHERE e.department_id = ?`;
+      params = [department_id];
+    }
+
+    if (semester) { sql += ' AND e.semester = ?'; params.push(semester); }
+    if (exam_type) { sql += ' AND e.exam_type = ?'; params.push(exam_type); }
+
+    sql += ' ORDER BY e.date ASC, e.start_time ASC';
+
+    const exams = await dbAll(sql, params);
+    res.json(exams);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch exams' });
+  }
+});
+
+app.post('/api/exams', authenticateToken, requireRole('teacher', 'hod', 'admin'), async (req, res) => {
+  const { course_id, title, exam_type, date, start_time, end_time, room, semester } = req.body;
+  const deptId = req.user.department_id;
+
+  if (!course_id || !title || !exam_type) {
+    return res.status(400).json({ error: 'course_id, title, and exam_type are required' });
+  }
+
+  const validExamTypes = ['internal', 'midterm', 'final'];
+  if (!validExamTypes.includes(exam_type)) {
+    return res.status(400).json({ error: `Invalid exam_type. Must be one of: ${validExamTypes.join(', ')}` });
+  }
+
+  try {
+    const result = await dbRun(
+      `INSERT INTO exams (course_id, department_id, title, exam_type, date, start_time, end_time, room, semester)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [course_id, deptId, title, exam_type, date || null, start_time || null, end_time || null, room || null, semester || null]
+    );
+    res.status(201).json({ id: result.lastID, message: 'Exam scheduled successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to schedule exam' });
+  }
+});
+
+app.put('/api/exams/:id', authenticateToken, requireRole('teacher', 'hod', 'admin'), async (req, res) => {
+  const examId = parseInt(req.params.id);
+  const { role, department_id } = req.user;
+  const { course_id, title, exam_type, date, start_time, end_time, room, semester } = req.body;
+
+  try {
+    const exam = await dbGet('SELECT * FROM exams WHERE id = ?', [examId]);
+    if (!exam) return res.status(404).json({ error: 'Exam not found' });
+
+    if (role !== 'admin' && exam.department_id !== department_id) {
+      return res.status(403).json({ error: 'You can only update exams in your department' });
+    }
+
+    await dbRun(
+      `UPDATE exams SET course_id = ?, title = ?, exam_type = ?, date = ?, start_time = ?, end_time = ?, room = ?, semester = ? WHERE id = ?`,
+      [course_id || exam.course_id, title || exam.title, exam_type || exam.exam_type, date || exam.date, start_time || exam.start_time, end_time || exam.end_time, room || exam.room, semester || exam.semester, examId]
+    );
+    res.json({ message: 'Exam updated successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update exam' });
+  }
+});
+
+app.delete('/api/exams/:id', authenticateToken, requireRole('teacher', 'hod', 'admin'), async (req, res) => {
+  const examId = parseInt(req.params.id);
+  const { role, department_id } = req.user;
+
+  try {
+    const exam = await dbGet('SELECT * FROM exams WHERE id = ?', [examId]);
+    if (!exam) return res.status(404).json({ error: 'Exam not found' });
+
+    if (role !== 'admin' && exam.department_id !== department_id) {
+      return res.status(403).json({ error: 'You can only delete exams in your department' });
+    }
+
+    await dbRun('DELETE FROM exams WHERE id = ?', [examId]);
+    res.json({ message: 'Exam deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete exam' });
+  }
+});
+
+// ==========================================
+// 18. INTERNAL MARKS API
+// ==========================================
+
+app.get('/api/internal-marks', authenticateToken, async (req, res) => {
+  const { role, department_id, id: userId } = req.user;
+  const { student_id, course_id } = req.query;
+
+  try {
+    let sql, params;
+
+    if (role === 'student') {
+      sql = `SELECT im.*, c.code as course_code, c.name as course_name
+             FROM internal_marks im
+             JOIN courses c ON im.course_id = c.id
+             WHERE im.student_id = ?`;
+      params = [userId];
+    } else if (role === 'admin') {
+      sql = `SELECT im.*, c.code as course_code, c.name as course_name, u.name as student_name, p.roll_number
+             FROM internal_marks im
+             JOIN courses c ON im.course_id = c.id
+             JOIN users u ON im.student_id = u.id
+             LEFT JOIN profiles p ON u.id = p.user_id
+             WHERE 1=1`;
+      params = [];
+    } else {
+      sql = `SELECT im.*, c.code as course_code, c.name as course_name, u.name as student_name, p.roll_number
+             FROM internal_marks im
+             JOIN courses c ON im.course_id = c.id
+             JOIN users u ON im.student_id = u.id
+             LEFT JOIN profiles p ON u.id = p.user_id
+             WHERE c.department_id = ?`;
+      params = [department_id];
+    }
+
+    if (student_id) { sql += ' AND im.student_id = ?'; params.push(student_id); }
+    if (course_id) { sql += ' AND im.course_id = ?'; params.push(course_id); }
+
+    sql += ' ORDER BY u.name ASC, c.code ASC, im.exam_type ASC';
+
+    const marks = await dbAll(sql, params);
+    res.json(marks);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch internal marks' });
+  }
+});
+
+app.post('/api/internal-marks', authenticateToken, requireRole('teacher', 'hod', 'admin'), async (req, res) => {
+  const { student_id, course_id, exam_type, marks_obtained, max_marks, remarks, academic_year } = req.body;
+
+  if (!student_id || !course_id || !exam_type) {
+    return res.status(400).json({ error: 'student_id, course_id, and exam_type are required' });
+  }
+
+  const validExamTypes = ['assessment1', 'assessment2', 'midterm', 'assignment'];
+  if (!validExamTypes.includes(exam_type)) {
+    return res.status(400).json({ error: `Invalid exam_type. Must be one of: ${validExamTypes.join(', ')}` });
+  }
+
+  try {
+    const result = await dbRun(
+      `INSERT INTO internal_marks (student_id, course_id, exam_type, marks_obtained, max_marks, remarks, academic_year)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [student_id, course_id, exam_type, marks_obtained || null, max_marks || null, remarks || null, academic_year || null]
+    );
+    res.status(201).json({ id: result.lastID, message: 'Internal marks recorded successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to record internal marks' });
+  }
+});
+
+app.delete('/api/internal-marks/:id', authenticateToken, requireRole('teacher', 'hod', 'admin'), async (req, res) => {
+  const markId = parseInt(req.params.id);
+
+  try {
+    const mark = await dbGet('SELECT id FROM internal_marks WHERE id = ?', [markId]);
+    if (!mark) return res.status(404).json({ error: 'Internal marks record not found' });
+
+    await dbRun('DELETE FROM internal_marks WHERE id = ?', [markId]);
+    res.json({ message: 'Internal marks record deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete internal marks' });
+  }
+});
+
+// ==========================================
+// 19. SEMESTER RESULTS API
+// ==========================================
+
+app.get('/api/semester-results', authenticateToken, async (req, res) => {
+  const { role, department_id, id: userId } = req.user;
+
+  try {
+    let sql, params;
+
+    if (role === 'student') {
+      sql = `SELECT sr.*, u.name as student_name
+             FROM semester_results sr
+             JOIN users u ON sr.student_id = u.id
+             WHERE sr.student_id = ?`;
+      params = [userId];
+    } else if (role === 'admin') {
+      sql = `SELECT sr.*, u.name as student_name, p.roll_number, d.code as dept_code
+             FROM semester_results sr
+             JOIN users u ON sr.student_id = u.id
+             LEFT JOIN profiles p ON u.id = p.user_id
+             LEFT JOIN departments d ON u.department_id = d.id
+             ORDER BY u.name ASC, sr.semester ASC`;
+      params = [];
+    } else {
+      sql = `SELECT sr.*, u.name as student_name, p.roll_number
+             FROM semester_results sr
+             JOIN users u ON sr.student_id = u.id
+             LEFT JOIN profiles p ON u.id = p.user_id
+             WHERE u.department_id = ?
+             ORDER BY u.name ASC, sr.semester ASC`;
+      params = [department_id];
+    }
+
+    const results = await dbAll(sql, params);
+    res.json(results);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch semester results' });
+  }
+});
+
+app.post('/api/semester-results', authenticateToken, requireRole('hod', 'admin'), async (req, res) => {
+  const { student_id, semester, sgpa, cgpa, total_credits, academic_year } = req.body;
+
+  if (!student_id || !semester) {
+    return res.status(400).json({ error: 'student_id and semester are required' });
+  }
+
+  try {
+    const existing = await dbGet(
+      'SELECT id FROM semester_results WHERE student_id = ? AND semester = ?',
+      [student_id, semester]
+    );
+
+    if (existing) {
+      await dbRun(
+        `UPDATE semester_results SET sgpa = ?, cgpa = ?, total_credits = ?, academic_year = ? WHERE id = ?`,
+        [sgpa || null, cgpa || null, total_credits || null, academic_year || null, existing.id]
+      );
+      res.json({ message: 'Semester result updated successfully' });
+    } else {
+      const result = await dbRun(
+        `INSERT INTO semester_results (student_id, semester, sgpa, cgpa, total_credits, academic_year)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [student_id, semester, sgpa || null, cgpa || null, total_credits || null, academic_year || null]
+      );
+      res.status(201).json({ id: result.lastID, message: 'Semester result recorded successfully' });
+    }
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to save semester result' });
+  }
+});
+
+// ==========================================
+// 20. GOOGLE SHEETS ENDPOINTS
+// ==========================================
+
 app.get('/api/sheets/urls', (req, res) => {
   const urls = getAllSheetUrls();
   res.json(urls);
 });
 
-// Sync localStorage registration to Google Sheets
 app.post('/api/sheets/sync-local', async (req, res) => {
   const { name, email, role, department } = req.body;
 
@@ -1269,7 +2028,14 @@ app.post('/api/sheets/sync-local', async (req, res) => {
   }
 });
 
-// Generic error handler (never expose stack traces)
+// ==========================================
+// ERROR HANDLERS (must be after all routes)
+// ==========================================
+
+app.use('/api/*splat', (req, res) => {
+  res.status(404).json({ error: `API endpoint ${req.method} ${req.path} not found` });
+});
+
 app.use((err, req, res, _next) => {
   console.error('[Server Error]', err.message);
   res.status(500).json({ error: 'An internal server error occurred' });
@@ -1280,7 +2046,7 @@ app.use((err, req, res, _next) => {
 // ==========================================
 
 app.listen(PORT, () => {
-  console.log(`\n✅ Alexandria ERP Backend running on http://localhost:${PORT}`);
+  console.log(`\n Alexandria ERP Backend running on http://localhost:${PORT}`);
   console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`   Allowed origins: ${ALLOWED_ORIGINS.join(', ')}\n`);
 });

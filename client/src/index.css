@@ -411,3 +411,671 @@ body {
 .footer-link:hover {
   color: #cccccc;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   NEW STYLES — Extended ERP Features
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Toast Notifications ──────────────────────────────────────────────────── */
+.toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: all;
+  min-width: 300px;
+  max-width: 420px;
+  padding: 14px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  animation: toastSlideIn 0.3s ease-out;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.toast-success {
+  background-color: #059669;
+  border-left: 4px solid #34d399;
+}
+
+.toast-error {
+  background-color: #dc2626;
+  border-left: 4px solid #f87171;
+}
+
+@keyframes toastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* ─── Chat Styles ──────────────────────────────────────────────────────────── */
+.chat-container {
+  display: flex;
+  height: calc(100vh - 140px);
+  background: var(--canvas-card-bg);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+}
+
+.chat-sidebar {
+  width: 300px;
+  border-right: 1px solid var(--border-light);
+  display: flex;
+  flex-direction: column;
+  background: #fafafa;
+}
+
+.chat-sidebar-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-light);
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 700;
+  color: #111;
+}
+
+.chat-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chat-input-area {
+  padding: 16px 20px;
+  border-top: 1px solid var(--border-light);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.chat-input-area input {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid #ccc;
+  border-radius: 20px;
+  font-size: 14px;
+  color: #111;
+  outline: none;
+}
+
+.chat-input-area input:focus {
+  border-color: var(--brand-blue);
+}
+
+.message-bubble {
+  max-width: 65%;
+  padding: 10px 16px;
+  border-radius: 16px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.message-sent {
+  align-self: flex-end;
+  background-color: var(--brand-blue);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+.message-received {
+  align-self: flex-start;
+  background-color: #f0f0f0;
+  color: #111;
+  border-bottom-left-radius: 4px;
+}
+
+.conversation-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background 0.15s;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.conversation-item:hover {
+  background: #f0eded;
+}
+
+.conversation-item.active {
+  background: var(--sidebar-active-bg);
+  border-left: 3px solid var(--brand-blue);
+}
+
+.unread-badge {
+  background: #ef4444;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+}
+
+/* ─── Discussion Styles ────────────────────────────────────────────────────── */
+.discussion-card {
+  background: var(--canvas-card-bg);
+  color: #111;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  transition: box-shadow 0.2s;
+}
+
+.discussion-card:hover {
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.14);
+}
+
+.discussion-card h3 {
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 700;
+  color: #0b2545;
+  margin-bottom: 8px;
+}
+
+.discussion-card p {
+  font-size: 14px;
+  color: #555;
+  line-height: 1.6;
+}
+
+.discussion-thread {
+  padding-left: 24px;
+  border-left: 2px solid var(--border-light);
+  margin-top: 16px;
+}
+
+.reply-card {
+  background: #f9f9f9;
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin-bottom: 10px;
+}
+
+.reply-card .reply-author {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--brand-blue);
+  margin-bottom: 4px;
+}
+
+.reply-card .reply-text {
+  font-size: 14px;
+  color: #333;
+  line-height: 1.5;
+}
+
+/* ─── Material Card Styles ─────────────────────────────────────────────────── */
+.material-card {
+  background: var(--canvas-card-bg);
+  color: #111;
+  border-radius: 12px;
+  padding: 20px 24px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+  transition: box-shadow 0.2s, transform 0.2s;
+  cursor: pointer;
+}
+
+.material-card:hover {
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.14);
+  transform: translateY(-1px);
+}
+
+.material-type-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.material-type-badge.pdf {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.material-type-badge.ppt {
+  background: #ffedd5;
+  color: #ea580c;
+}
+
+.material-type-badge.doc {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.material-type-badge.video {
+  background: #f3e8ff;
+  color: #9333ea;
+}
+
+.material-type-badge.image {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.material-type-badge.zip {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.material-type-badge.notes {
+  background: #ccfbf1;
+  color: #0d9488;
+}
+
+/* ─── Notification Panel ───────────────────────────────────────────────────── */
+.notification-panel {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  width: 360px;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  border: 1px solid #e5e7eb;
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.notification-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e5e7eb;
+  font-weight: 600;
+  font-size: 14px;
+  color: #111827;
+}
+
+.notification-panel-body {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.notification-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f3f4f6;
+  cursor: pointer;
+  transition: background 0.15s;
+  border-left: 3px solid transparent;
+  background: transparent;
+}
+
+.notification-item:hover {
+  background: #f9fafb;
+}
+
+.notification-item.unread {
+  border-left-color: #3b82f6;
+  background: #eff6ff;
+}
+
+.notification-item .notif-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.notification-item .notif-message {
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+.notification-item .notif-time {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-top: 2px;
+}
+
+.notification-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #ef4444;
+  color: #fff;
+  border-radius: 50%;
+  min-width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 0 4px;
+  pointer-events: none;
+}
+
+/* ─── Status Badges ────────────────────────────────────────────────────────── */
+.status-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: capitalize;
+  letter-spacing: 0.3px;
+}
+
+.status-present {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.status-absent {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.status-late {
+  background: #fef9c3;
+  color: #a16207;
+}
+
+.status-graded {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.status-submitted {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.status-not-submitted {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+/* ─── Empty State ──────────────────────────────────────────────────────────── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+  color: #9ca3af;
+}
+
+.empty-state-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.4;
+}
+
+.empty-state-text {
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: #6b7280;
+}
+
+.empty-state-sub {
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+/* ─── Loading Spinner ──────────────────────────────────────────────────────── */
+.loading-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(255, 255, 255, 0.15);
+  border-top-color: var(--brand-blue);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ─── CGPA Calculator ──────────────────────────────────────────────────────── */
+.cgpa-display {
+  font-family: var(--font-heading);
+  font-size: 48px;
+  font-weight: 700;
+  color: var(--accent-gold);
+  text-align: center;
+  margin: 24px 0;
+}
+
+.cgpa-input-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 10px 16px;
+  background: #f9f9f9;
+  border-radius: 8px;
+}
+
+.cgpa-input-row label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #444;
+  min-width: 100px;
+}
+
+.cgpa-input-row input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+  outline: none;
+}
+
+.cgpa-input-row input:focus {
+  border-color: var(--brand-blue);
+}
+
+/* ─── Modal Enhancements ───────────────────────────────────────────────────── */
+.modal-large {
+  max-width: 700px;
+}
+
+/* ─── Responsive Design ────────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(6, 1fr);
+    padding: 0 24px 24px 24px;
+  }
+
+  .welcome-title {
+    font-size: 32px;
+  }
+
+  .welcome-hero {
+    padding: 16px 24px 24px 24px;
+  }
+
+  .top-header-bar {
+    padding: 16px 24px;
+  }
+
+  .alexandria-footer {
+    padding: 20px 24px;
+  }
+
+  .chat-sidebar {
+    width: 240px;
+  }
+
+  .notification-panel {
+    width: 320px;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-container {
+    flex-direction: column;
+  }
+
+  .alexandria-sidebar {
+    width: 100%;
+    flex-direction: row;
+    padding: 12px 16px;
+    overflow-x: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border-light);
+    justify-content: flex-start;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .brand-title {
+    font-size: 16px;
+    margin-bottom: 0;
+    white-space: nowrap;
+  }
+
+  .profile-card-mini {
+    display: none;
+  }
+
+  .sidebar-nav {
+    flex-direction: row;
+    flex: none;
+    gap: 2px;
+    overflow-x: auto;
+  }
+
+  .nav-item {
+    padding: 8px 12px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+    padding: 0 16px 16px 16px;
+  }
+
+  .welcome-title {
+    font-size: 24px;
+  }
+
+  .welcome-hero {
+    padding: 12px 16px 16px 16px;
+  }
+
+  .top-header-bar {
+    padding: 12px 16px;
+    flex-wrap: wrap;
+  }
+
+  .search-archive-wrapper {
+    width: 100%;
+  }
+
+  .alexandria-footer {
+    flex-direction: column;
+    gap: 8px;
+    text-align: center;
+    padding: 16px;
+  }
+
+  .footer-links {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+  }
+
+  .chat-container {
+    flex-direction: column;
+    height: auto;
+  }
+
+  .chat-sidebar {
+    width: 100%;
+    max-height: 200px;
+  }
+
+  .notification-panel {
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    border-radius: 16px 16px 0 0;
+    max-height: 60vh;
+  }
+
+  .material-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .modal-content {
+    padding: 24px;
+  }
+
+  .modal-large {
+    max-width: 100%;
+  }
+
+  .cgpa-display {
+    font-size: 36px;
+  }
+
+  .cgpa-input-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .cgpa-input-row label {
+    min-width: auto;
+  }
+}

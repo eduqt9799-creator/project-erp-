@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Sidebar from './components/Sidebar';
 import TopHeader from './components/TopHeader';
 import AuthModal, { getSession, clearSession, updateSessionProfile } from './components/AuthModal';
@@ -94,6 +94,14 @@ function getInitialDashboardStats(user) {
       { id: 3, code: 'MECH', name: 'Mechanical Engineering', hod_name: 'Dr. James Watt', student_count: 240, faculty_count: 14 },
       { id: 4, code: 'CIVIL', name: 'Civil Engineering', hod_name: 'Dr. E. Sreedharan', student_count: 200, faculty_count: 12 },
     ],
+    // New fields for extended features
+    study_materials: [],
+    notifications: [],
+    timetable: [],
+    exams: [],
+    internal_marks: [],
+    semester_results: [],
+    discussions: [],
   };
 }
 
@@ -103,12 +111,18 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [dashboardStats, setDashboardStats] = useState(null);
 
+  // Notification state
+  const [notifications, setNotifications] = useState([]);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const [unreadChatCount] = useState(0);
+
   // Load session & stats on mount
   useEffect(() => {
     const session = getSession();
     if (session) {
       setCurrentUser(session);
       loadStats(session);
+      loadNotifications();
     }
     setLoadingUser(false);
   }, []);
@@ -136,15 +150,74 @@ export default function App() {
     }
   };
 
+  const loadNotifications = useCallback(async () => {
+    const token = localStorage.getItem('alexandria_token');
+    if (!token) return;
+
+    try {
+      const res = await fetch('/api/notifications', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok && Array.isArray(data)) {
+        setNotifications(data);
+        setUnreadNotificationCount(data.filter((n) => !n.is_read).length);
+      }
+    } catch {
+      // Silently fail — notifications are non-critical
+    }
+  }, []);
+
+  const handleMarkNotificationRead = useCallback(async (notificationId) => {
+    const token = localStorage.getItem('alexandria_token');
+    if (!token) return;
+
+    try {
+      const res = await fetch(`/api/notifications/${notificationId}/read`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setNotifications((prev) =>
+          prev.map((n) => (n.id === notificationId ? { ...n, is_read: true } : n))
+        );
+        setUnreadNotificationCount((prev) => Math.max(0, prev - 1));
+      }
+    } catch {
+      // Silently fail
+    }
+  }, []);
+
+  const handleMarkAllNotificationsRead = useCallback(async () => {
+    const token = localStorage.getItem('alexandria_token');
+    if (!token) return;
+
+    try {
+      const res = await fetch('/api/notifications/read-all', {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+        setUnreadNotificationCount(0);
+      }
+    } catch {
+      // Silently fail
+    }
+  }, []);
+
   const handleLoginSuccess = (user) => {
     setCurrentUser(user);
     loadStats(user);
+    loadNotifications();
   };
 
   const handleLogout = () => {
     clearSession();
     setCurrentUser(null);
     setDashboardStats(null);
+    setNotifications([]);
+    setUnreadNotificationCount(0);
   };
 
   const handleProfileUpdated = (updatedUser) => {
@@ -152,6 +225,7 @@ export default function App() {
     loadStats(updatedUser);
   };
 
+  // ─── Loading Screen ───────────────────────────────────────────────────────
   if (loadingUser) {
     return (
       <div style={{ backgroundColor: '#07080a', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontFamily: 'Cinzel, serif', fontSize: '24px' }}>
@@ -160,7 +234,7 @@ export default function App() {
     );
   }
 
-  // If not logged in, render Auth Modal (role-select → register → login)
+  // ─── Not Logged In: Auth Modal ────────────────────────────────────────────
   if (!currentUser) {
     return (
       <AuthModal
@@ -184,7 +258,15 @@ export default function App() {
 
       {/* Main Canvas Area */}
       <main className="main-canvas">
-        <TopHeader />
+        <TopHeader
+          onSearch={(query) => {
+            /* search handled in portals */
+          }}
+          notifications={notifications}
+          unreadCount={unreadNotificationCount}
+          onNotificationClick={handleMarkNotificationRead}
+          onMarkAllRead={handleMarkAllNotificationsRead}
+        />
 
         {/* Dynamic Portal View based on User Role */}
         {currentUser.role === 'student' && (
@@ -226,4 +308,3 @@ export default function App() {
     </div>
   );
 }
-

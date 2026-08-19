@@ -1,25 +1,72 @@
 import React from 'react';
-import { LayoutDashboard, Users, BookOpen, BarChart3, Settings, LogOut, ShieldAlert, GraduationCap, CheckSquare } from 'lucide-react';
+import { LayoutDashboard, Users, BookOpen, BarChart3, Settings, LogOut, ShieldAlert, GraduationCap, CheckSquare, FileText, Bell, MessageSquare, Clock, Award, Calendar, Send, Upload, AlertCircle, Megaphone } from 'lucide-react';
+
+const navItemsByRole = {
+  student: [
+    { key: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { key: 'study-materials', icon: FileText, label: 'Study Materials' },
+    { key: 'assignments', icon: BookOpen, label: 'Assignments' },
+    { key: 'attendance', icon: CheckSquare, label: 'My Attendance' },
+    { key: 'timetable', icon: Calendar, label: 'Timetable' },
+    { key: 'exams', icon: Clock, label: 'Exam Schedule' },
+    { key: 'internal-marks', icon: BarChart3, label: 'Internal Marks' },
+    { key: 'results', icon: Award, label: 'Results & CGPA' },
+    { key: 'notifications', icon: Bell, label: 'Notifications' },
+    { key: 'chat', icon: MessageSquare, label: 'Messages' },
+    { key: 'discussions', icon: Megaphone, label: 'Discussion Forum' },
+    { key: 'settings', icon: Settings, label: 'Profile Settings' },
+  ],
+  teacher: [
+    { key: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { key: 'study-materials', icon: Upload, label: 'Study Materials' },
+    { key: 'assignments', icon: BookOpen, label: 'Assignments' },
+    { key: 'attendance', icon: CheckSquare, label: 'Take Attendance' },
+    { key: 'grading', icon: BarChart3, label: 'Gradebook' },
+    { key: 'internal-marks', icon: Award, label: 'Internal Marks' },
+    { key: 'notifications', icon: Bell, label: 'Notifications' },
+    { key: 'chat', icon: MessageSquare, label: 'Messages' },
+    { key: 'discussions', icon: Megaphone, label: 'Discussion Forum' },
+    { key: 'settings', icon: Settings, label: 'Profile Settings' },
+  ],
+  hod: [
+    { key: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { key: 'faculty', icon: Users, label: 'Faculty Management' },
+    { key: 'students', icon: Users, label: 'Student Management' },
+    { key: 'curriculum', icon: BookOpen, label: 'Curriculum' },
+    { key: 'attendance', icon: CheckSquare, label: 'Attendance Monitor' },
+    { key: 'announcements', icon: Megaphone, label: 'Announcements' },
+    { key: 'notifications', icon: Bell, label: 'Notifications' },
+    { key: 'chat', icon: MessageSquare, label: 'HOD Communication' },
+    { key: 'settings', icon: Settings, label: 'Profile Settings' },
+  ],
+  admin: [
+    { key: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { key: 'departments', icon: GraduationCap, label: 'Departments' },
+    { key: 'users', icon: Users, label: 'User Management' },
+    { key: 'attendance', icon: CheckSquare, label: 'Institutional Attendance' },
+    { key: 'settings', icon: Settings, label: 'Profile Settings' },
+  ],
+};
+
+const roleLabels = {
+  admin: 'System Admin',
+  hod: 'HOD Academic Portal',
+  teacher: 'Academic Professor',
+  student: 'Student Portal',
+};
 
 export default function Sidebar({ currentUser, activeTab, setActiveTab, onLogout }) {
   if (!currentUser) return null;
 
-  const roleLabels = {
-    admin: 'System Admin',
-    hod: 'HOD Academic Portal',
-    teacher: 'Academic Professor',
-    student: 'Student Portal'
-  };
-
   const roleBadge = roleLabels[currentUser.role] || 'Academic Portal';
   const deptCode = currentUser.dept_code || 'CSE';
+  const navItems = navItemsByRole[currentUser.role] || [];
 
   return (
     <aside className="alexandria-sidebar">
       <div>
         <div className="brand-title">Hindusthan CSE Department</div>
 
-        {/* Profile Card Block (Matches Screenshot) */}
         <div className="profile-card-mini">
           <div className="profile-avatar-box">
             {currentUser.avatar ? (
@@ -34,141 +81,20 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab, onLogout
           </div>
         </div>
 
-        {/* Navigation Links (Matches Screenshot) */}
         <nav className="sidebar-nav">
-          <div 
-            className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
-            onClick={() => setActiveTab('dashboard')}
-          >
-            <LayoutDashboard />
-            <span>Dashboard</span>
-          </div>
-
-          {currentUser.role === 'student' && (
-            <>
-              <div 
-                className={`nav-item ${activeTab === 'attendance' ? 'active' : ''}`}
-                onClick={() => setActiveTab('attendance')}
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <div
+                key={item.key}
+                className={`nav-item ${activeTab === item.key ? 'active' : ''}`}
+                onClick={() => setActiveTab(item.key)}
               >
-                <CheckSquare />
-                <span>My Attendance</span>
+                <Icon />
+                <span>{item.label}</span>
               </div>
-              <div 
-                className={`nav-item ${activeTab === 'courses' ? 'active' : ''}`}
-                onClick={() => setActiveTab('courses')}
-              >
-                <BookOpen />
-                <span>My CSE Courses</span>
-              </div>
-              <div 
-                className={`nav-item ${activeTab === 'directory' ? 'active' : ''}`}
-                onClick={() => setActiveTab('directory')}
-              >
-                <Users />
-                <span>Faculty Directory</span>
-              </div>
-              <div 
-                className={`nav-item ${activeTab === 'grades' ? 'active' : ''}`}
-                onClick={() => setActiveTab('grades')}
-              >
-                <BarChart3 />
-                <span>Grade Transcript</span>
-              </div>
-            </>
-          )}
-
-          {currentUser.role === 'teacher' && (
-            <>
-              <div 
-                className={`nav-item ${activeTab === 'attendance' ? 'active' : ''}`}
-                onClick={() => setActiveTab('attendance')}
-              >
-                <CheckSquare />
-                <span>Take Attendance</span>
-              </div>
-              <div 
-                className={`nav-item ${activeTab === 'students' ? 'active' : ''}`}
-                onClick={() => setActiveTab('students')}
-              >
-                <Users />
-                <span>CSE Students</span>
-              </div>
-              <div 
-                className={`nav-item ${activeTab === 'courses' ? 'active' : ''}`}
-                onClick={() => setActiveTab('courses')}
-              >
-                <BookOpen />
-                <span>Academic Control</span>
-              </div>
-              <div 
-                className={`nav-item ${activeTab === 'grading' ? 'active' : ''}`}
-                onClick={() => setActiveTab('grading')}
-              >
-                <BarChart3 />
-                <span>Gradebook & Marks</span>
-              </div>
-            </>
-          )}
-
-          {currentUser.role === 'hod' && (
-            <>
-              <div 
-                className={`nav-item ${activeTab === 'attendance' ? 'active' : ''}`}
-                onClick={() => setActiveTab('attendance')}
-              >
-                <CheckSquare />
-                <span>Class Attendance & Alerts</span>
-              </div>
-              <div 
-                className={`nav-item ${activeTab === 'allocation' ? 'active' : ''}`}
-                onClick={() => setActiveTab('allocation')}
-              >
-                <Users />
-                <span>Subject & Faculty Allocations</span>
-              </div>
-              <div 
-                className={`nav-item ${activeTab === 'curriculum' ? 'active' : ''}`}
-                onClick={() => setActiveTab('curriculum')}
-              >
-                <BookOpen />
-                <span>Curriculum & Syllabi</span>
-              </div>
-            </>
-          )}
-
-          {currentUser.role === 'admin' && (
-            <>
-              <div 
-                className={`nav-item ${activeTab === 'departments' ? 'active' : ''}`}
-                onClick={() => setActiveTab('departments')}
-              >
-                <GraduationCap />
-                <span>Departments</span>
-              </div>
-              <div 
-                className={`nav-item ${activeTab === 'users' ? 'active' : ''}`}
-                onClick={() => setActiveTab('users')}
-              >
-                <Users />
-                <span>User Management</span>
-              </div>
-              <div 
-                className={`nav-item ${activeTab === 'attendance' ? 'active' : ''}`}
-                onClick={() => setActiveTab('attendance')}
-              >
-                <CheckSquare />
-                <span>Institutional Attendance</span>
-              </div>
-            </>
-          )}
-
-          <div 
-            className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
-            onClick={() => setActiveTab('settings')}
-          >
-            <Settings />
-            <span>Profile Settings</span>
-          </div>
+            );
+          })}
         </nav>
       </div>
 
