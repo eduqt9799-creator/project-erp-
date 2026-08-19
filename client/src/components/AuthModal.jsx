@@ -178,6 +178,18 @@ export default function AuthModal({ onLoginSuccess, onRegisterSuccess }) {
 
     saveUser(newUser);
     triggerAlert('Registration successful! Redirecting to login...', 'success');
+
+    // Sync to Google Sheets (fire-and-forget)
+    fetch('/api/sheets/sync-local', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: newUser.name,
+        email: newUser.email,
+        role: newUser.role,
+        department: newUser.department
+      })
+    }).catch(() => {});
     
     setTimeout(() => {
       setLoginEmail(regEmail);

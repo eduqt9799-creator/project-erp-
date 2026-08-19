@@ -32,3 +32,6 @@ pnpm-debug.log*
 .idea/
 .DS_Store
 Thumbs.db
+
+# Google Service Account credentials
+server/credentials.json

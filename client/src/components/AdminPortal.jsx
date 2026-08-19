@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { GraduationCap, Users, Shield, PlusCircle, Building, Trash2 } from 'lucide-react';
+import { GraduationCap, Users, Shield, PlusCircle, Building, Trash2, ExternalLink, FileSpreadsheet } from 'lucide-react';
 import SettingsTab from './SettingsTab';
 import YearSelector from './YearSelector';
 
@@ -8,6 +8,7 @@ export default function AdminPortal({ stats, user, activeTab }) {
   const [allUsers, setAllUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [sheetUrls, setSheetUrls] = useState({});
 
   // Form states for Admin user creation
   const [newName, setNewName] = useState('');
@@ -36,6 +37,11 @@ export default function AdminPortal({ stats, user, activeTab }) {
     if (activeTab === 'users' || activeTab === 'dashboard' || !activeTab) {
       fetchUsers();
     }
+    // Fetch Google Sheet URLs
+    fetch('/api/sheets/urls')
+      .then(res => res.json())
+      .then(data => setSheetUrls(data))
+      .catch(() => {});
   }, [activeTab]);
 
   const firstYearCount = allUsers.filter(u => u.role === 'student' && u.academic_year === 1).length;
@@ -172,6 +178,56 @@ export default function AdminPortal({ stats, user, activeTab }) {
                     <div>👔 HOD: <strong>{d.hod_name || 'Dr. Alan Turing'}</strong></div>
                     <div>👨‍🏫 Faculty: <strong>{d.teacher_count || 0}</strong> • 🎓 Students: <strong>{d.student_count || 0}</strong></div>
                   </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Google Sheets Registration Links */}
+          <div className="card-white" style={{ gridColumn: 'span 12' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h2 className="card-white-title">Registration Data — Google Sheets</h2>
+              <span className="card-white-subtitle">LIVE SYNC</span>
+            </div>
+            <p style={{ fontSize: '13px', color: '#666', marginTop: '-12px', marginBottom: '20px' }}>
+              All portal registrations are automatically synced to separate Google Sheets. Click to view real-time data.
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+              {[
+                { role: 'student', label: 'Student Registrations', color: '#0f4c81' },
+                { role: 'teacher', label: 'Teacher Registrations', color: '#15803d' },
+                { role: 'hod', label: 'HOD Registrations', color: '#c5a059' },
+                { role: 'admin', label: 'Admin Registrations', color: '#7c3aed' }
+              ].map(({ role, label, color }) => (
+                <div key={role} style={{ border: '1px solid #e2dfd7', borderRadius: '10px', padding: '20px', backgroundColor: '#faf9f6', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                  <FileSpreadsheet size={32} color={color} />
+                  <div style={{ fontSize: '14px', fontWeight: 700, color: '#111', textAlign: 'center' }}>{label}</div>
+                  {sheetUrls[role] ? (
+                    <a
+                      href={sheetUrls[role]}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '8px 16px',
+                        backgroundColor: color,
+                        color: '#ffffff',
+                        borderRadius: '6px',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        textDecoration: 'none',
+                        transition: 'opacity 0.15s'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
+                      onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+                    >
+                      <ExternalLink size={14} /> Open Sheet
+                    </a>
+                  ) : (
+                    <span style={{ fontSize: '12px', color: '#999' }}>Not configured</span>
+                  )}
                 </div>
               ))}
             </div>

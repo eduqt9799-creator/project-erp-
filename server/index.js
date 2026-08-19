@@ -6,6 +6,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
 const db = require('./db');
+const { initSheets, appendToSheet, getAllSheetUrls } = require('./sheets');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -79,6 +80,11 @@ const requireRole = (...roles) => (req, res, next) => {
 };
 
 // ==========================================
+// GOOGLE SHEETS INITIALIZATION
+// ==========================================
+initSheets().catch(err => console.error('[Sheets] Init error:', err.message));
+
+// ==========================================
 // 1. PUBLIC & AUTH ROUTES
 // ==========================================
 
@@ -139,6 +145,10 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
        FROM users u LEFT JOIN departments d ON u.department_id = d.id WHERE u.id = ?`,
       [userId]
     );
+
+    // Sync to Google Sheets (fire-and-forget)
+    const deptName = newUser?.dept_name || 'N/A';
+    appendToSheet(role, [name, email, role, deptName, new Date().toISOString(), 'Self-Registration', '']).catch(() => {});
 
     res.status(201).json({ message: 'User registered successfully', token, user: newUser });
   } catch (err) {
@@ -955,6 +965,11 @@ app.post('/api/hod/teachers', authenticateToken, requireRole('hod', 'admin'), as
       [userId, employee_id || `EMP-CSE-${userId}`, designation || 'Associate Professor', specialization || 'Computer Science', office_room || 'Turing Hall', phone || null]
     );
 
+    // Sync to Google Sheets (fire-and-forget)
+    const hodDept = await dbGet('SELECT name FROM departments WHERE id = ?', [deptId]).catch(() => null);
+    const hodExtra = `Emp ID: ${employee_id || `EMP-CSE-${userId}`}, Designation: ${designation || 'Associate Professor'}, Specialization: ${specialization || 'Computer Science'}`;
+    appendToSheet('teacher', [name, email, 'teacher', hodDept?.name || 'N/A', new Date().toISOString(), 'HOD-Created', hodExtra]).catch(() => {});
+
     res.status(201).json({ message: `Faculty account created for ${name}!`, id: userId });
   } catch (err) {
     res.status(500).json({ error: 'Failed to create faculty account' });
@@ -1169,6 +1184,11 @@ app.post('/api/admin/users', authenticateToken, requireRole('admin'), async (req
       [userId, roll_number || null, employee_id || null, designation || null, batch_year || (academic_year === 2 ? '2024 - 2028' : '2025 - 2029'), Number(academic_year || 1)]
     );
 
+    // Sync to Google Sheets (fire-and-forget)
+    const adminDept = await dbGet('SELECT name FROM departments WHERE id = ?', [department_id]).catch(() => null);
+    const extraInfo = role === 'student' ? `Roll: ${roll_number || 'N/A'}, Batch: ${batch_year || 'N/A'}` : `Emp ID: ${employee_id || 'N/A'}, Designation: ${designation || 'N/A'}`;
+    appendToSheet(role, [name, email, role, adminDept?.name || 'N/A', new Date().toISOString(), 'Admin-Created', extraInfo]).catch(() => {});
+
     res.status(201).json({ message: `${role.toUpperCase()} account created successfully!`, userId });
   } catch (err) {
     res.status(500).json({ error: 'Failed to create user account' });
@@ -1212,6 +1232,41 @@ app.delete('/api/admin/users/:id', authenticateToken, requireRole('admin'), asyn
 // Handle 404 for unknown API routes
 app.use('/api/*splat', (req, res) => {
   res.status(404).json({ error: `API endpoint ${req.method} ${req.path} not found` });
+});
+
+// ==========================================
+// GOOGLE SHEETS ENDPOINTS
+// ==========================================
+
+// Get all registration sheet URLs
+app.get('/api/sheets/urls', (req, res) => {
+  const urls = getAllSheetUrls();
+  res.json(urls);
+});
+
+// Sync localStorage registration to Google Sheets
+app.post('/api/sheets/sync-local', async (req, res) => {
+  const { name, email, role, department } = req.body;
+
+  if (!name || !email || !role) {
+    return res.status(400).json({ error: 'name, email, and role are required' });
+  }
+
+  const ok = await appendToSheet(role, [
+    name,
+    email,
+    role,
+    department || 'N/A',
+    new Date().toISOString(),
+    'Self-Registration',
+    ''
+  ]);
+
+  if (ok) {
+    res.json({ message: 'Registration synced to Google Sheets' });
+  } else {
+    res.status(503).json({ error: 'Google Sheets sync unavailable' });
+  }
 });
 
 // Generic error handler (never expose stack traces)
