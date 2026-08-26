@@ -1,0 +1,129 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-primary: #000000;
+    --bg-sidebar: #ededf0;
+    --bg-card: #ffffff;
+    --text-primary: #0f172a;
+    --text-muted: #64748b;
+    --brand-blue: #1d4ed8;
+  }
+
+  body {
+    background-color: #000000;
+    color: #f8fafc;
+    font-family: 'Inter', system-ui, sans-serif;
+    margin: 0;
+    overflow-x: hidden;
+  }
+
+  h1, h2, .font-serif-academic {
+    font-family: 'Playfair Display', Georgia, serif;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #000000;
+}
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+
+/* White Theme Cards matching user design */
+.alexandria-card {
+  background: #ffffff;
+  color: #0f172a;
+  border-radius: 1rem;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
+  border: 1px solid #e2e8f0;
+  transition: all 0.2s ease;
+}
+
+.alexandria-card:hover {
+  box-shadow: 0 8px 30px -4px rgba(0, 0, 0, 0.7);
+}
+
+/* Dark Panel fallback for specific code boxes */
+.alexandria-panel-dark {
+  background: #09090b;
+  border: 1px solid #27272a;
+  color: #f4f4f5;
+  border-radius: 1rem;
+}
+
+/* Table styling for white theme */
+.erp-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.erp-table th {
+  background: #f8fafc;
+  color: #475569;
+  font-weight: 700;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+}
+
+.erp-table td {
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid #f1f5f9;
+  color: #1e293b;
+  font-size: 0.875rem;
+}
+
+.erp-table tr:last-child td {
+  border-bottom: none;
+}
+
+.erp-table tr:hover td {
+  background: #f8fafc;
+}
+
+/* Excel Timetable Grid White Theme */
+.timetable-grid {
+  display: grid;
+  grid-template-columns: 140px repeat(6, minmax(130px, 1fr));
+  gap: 1px;
+  background: #e2e8f0;
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+.timetable-cell {
+  background: #ffffff;
+  padding: 0.75rem;
+  min-height: 85px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: background 0.15s ease;
+}
+
+.timetable-cell.editable:hover {
+  background: #f1f5f9;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px #1d4ed8;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
