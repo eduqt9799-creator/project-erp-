@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Users, BookOpen, Megaphone, Plus, Trash2, Edit, CheckCircle } from 'lucide-react';
+import { Users, BookOpen, Megaphone, Plus, Trash2, Edit, CheckCircle, FileText, FolderDown, Upload, Sparkles } from 'lucide-react';
 import SettingsTab from './SettingsTab';
 import YearSelector from './YearSelector';
 
-export default function HodPortal({ stats, user, activeTab }) {
+export default function HodPortal({ stats, user, activeTab, onProfileUpdated, onRefresh }) {
   const [selectedYear, setSelectedYear] = useState(0); // 0 = All, 1 = 1st Year, 2 = 2nd Year
 
   // Broadcast state
@@ -13,6 +13,15 @@ export default function HodPortal({ stats, user, activeTab }) {
   const [noticeContent, setNoticeContent] = useState('');
   const [targetRole, setTargetRole] = useState('all');
   const [publishing, setPublishing] = useState(false);
+
+  // Material state
+  const [showMaterialModal, setShowMaterialModal] = useState(false);
+  const [matCourseId, setMatCourseId] = useState(1);
+  const [matTitle, setMatTitle] = useState('');
+  const [matDesc, setMatDesc] = useState('');
+  const [matUrl, setMatUrl] = useState('');
+  const [matType, setMatType] = useState('pdf');
+  const [uploadingMat, setUploadingMat] = useState(false);
 
   // Faculty state
   const [showAddFacultyModal, setShowAddFacultyModal] = useState(false);
@@ -45,7 +54,7 @@ export default function HodPortal({ stats, user, activeTab }) {
 
   if (!stats) return <div style={{ color: '#aaa', padding: '40px' }}>Loading CSE HOD Portal...</div>;
 
-  const { department, teachersCount, studentsCount, coursesCount, teachers, students, courses, announcements, studentAttendanceReports } = stats;
+  const { department, teachersCount, studentsCount, coursesCount, teachers, students, courses, announcements, studentAttendanceReports, materials = [] } = stats;
 
   const firstYearStudents = students.filter(s => s.academic_year === 1);
   const secondYearStudents = students.filter(s => s.academic_year === 2);
@@ -57,6 +66,66 @@ export default function HodPortal({ stats, user, activeTab }) {
   const displayedCourses = selectedYear === 0 
     ? courses 
     : courses.filter(c => c.academic_year === selectedYear);
+
+  const displayedMaterials = selectedYear === 0
+    ? materials
+    : materials.filter(m => {
+        const c = courses.find(course => course.id === m.course_id);
+        return c ? c.academic_year === selectedYear : true;
+      });
+
+  const handleUploadMaterial = async (e) => {
+    e.preventDefault();
+    setUploadingMat(true);
+    const token = localStorage.getItem('alexandria_token');
+    try {
+      const res = await fetch('/api/materials', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          course_id: Number(matCourseId || courses[0]?.id || 1),
+          title: matTitle,
+          description: matDesc,
+          file_url: matUrl,
+          file_type: matType
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to upload material');
+
+      alert('Course material uploaded successfully!');
+      setShowMaterialModal(false);
+      setMatTitle('');
+      setMatDesc('');
+      setMatUrl('');
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setUploadingMat(false);
+    }
+  };
+
+  const handleDeleteMaterial = async (matId) => {
+    if (!window.confirm('Are you sure you want to delete this course material?')) return;
+    const token = localStorage.getItem('alexandria_token');
+    try {
+      const res = await fetch(`/api/materials/${matId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      alert('Material deleted successfully!');
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
 
   const displayedAttendanceReports = selectedYear === 0 
     ? studentAttendanceReports 
@@ -186,6 +255,7 @@ export default function HodPortal({ stats, user, activeTab }) {
       setEditingNotice(null);
       setNoticeTitle('');
       setNoticeContent('');
+      if (onRefresh) onRefresh();
     } catch (err) {
       alert(err.message);
     } finally {
@@ -205,6 +275,7 @@ export default function HodPortal({ stats, user, activeTab }) {
       if (!res.ok) throw new Error(data.error);
 
       alert('Broadcast notice deleted successfully!');
+      if (onRefresh) onRefresh();
     } catch (err) {
       alert(err.message);
     }
@@ -710,9 +781,81 @@ export default function HodPortal({ stats, user, activeTab }) {
         </div>
       )}
 
-      {/* 5. DEDICATED TAB: PROFILE SETTINGS */}
+      {/* 5. DEDICATED TAB: COURSE MATERIALS & RESOURCES */}
+      {activeTab === 'materials' && (
+        <div>
+          <YearSelector
+            selectedYear={selectedYear}
+            onSelectYear={setSelectedYear}
+            firstYearCount={firstYearStudents.length}
+            secondYearCount={secondYearStudents.length}
+            title="Materials Batch Filter"
+          />
+          <div className="dashboard-grid">
+            <div className="card-white" style={{ gridColumn: 'span 12' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <div>
+                  <h2 className="card-white-title">CSE Course Materials Library ({selectedYear === 0 ? 'All Batches' : `${selectedYear}${selectedYear === 1 ? 'st' : 'nd'} Year`})</h2>
+                  <p style={{ fontSize: '13px', color: '#666' }}>Department study materials, lecture notes, lab manuals, and syllabus resources.</p>
+                </div>
+                <button
+                  onClick={() => setShowMaterialModal(true)}
+                  className="btn-primary"
+                  style={{ padding: '8px 16px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Plus size={16} /> Upload Study Material
+                </button>
+              </div>
+
+              {displayedMaterials.length === 0 ? (
+                <div style={{ padding: '30px', textAlign: 'center', color: '#777', background: '#faf9f6', borderRadius: '8px', border: '1px solid #eae8e3' }}>
+                  No study materials uploaded for this selection yet. Click "+ Upload Study Material" above to publish notes or PDFs!
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
+                  {displayedMaterials.map(mat => (
+                    <div key={mat.id} style={{ border: '1px solid #e2dfd7', borderRadius: '10px', padding: '20px', backgroundColor: '#faf9f6', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                          <span style={{ fontSize: '12px', fontWeight: 800, background: '#0f4c81', color: '#ffffff', padding: '4px 10px', borderRadius: '6px' }}>
+                            {mat.course_code}
+                          </span>
+                          <button
+                            onClick={() => handleDeleteMaterial(mat.id)}
+                            style={{ background: 'none', border: 'none', color: '#b91c1c', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 600 }}
+                          >
+                            <Trash2 size={14} /> Remove
+                          </button>
+                        </div>
+                        <h3 style={{ fontFamily: 'Playfair Display, serif', fontSize: '18px', fontWeight: 700, color: '#111' }}>{mat.title}</h3>
+                        <p style={{ fontSize: '13px', color: '#555', marginTop: '6px', lineHeight: 1.4 }}>{mat.description}</p>
+                      </div>
+
+                      <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid #eae8e3', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ fontSize: '11px', color: '#777' }}>
+                          Uploaded by <strong>{mat.uploader_name || 'Faculty'}</strong> • {mat.created_at?.split(' ')[0] || 'Recent'}
+                        </div>
+                        <a
+                          href={mat.file_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ padding: '6px 12px', background: '#0d2847', color: '#ffffff', borderRadius: '6px', fontSize: '12px', fontWeight: 700, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        >
+                          <FolderDown size={14} /> Open Material
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 6. DEDICATED TAB: PROFILE SETTINGS */}
       {activeTab === 'settings' && (
-        <SettingsTab user={user} />
+        <SettingsTab user={user} onProfileUpdated={onProfileUpdated} />
       )}
 
       {/* ADD FACULTY MODAL */}
@@ -1002,6 +1145,83 @@ export default function HodPortal({ stats, user, activeTab }) {
                 </button>
                 <button type="submit" className="btn-primary" disabled={creatingCourse}>
                   {creatingCourse ? 'Adding...' : 'Add Course'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Upload Course Material Modal */}
+      {showMaterialModal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h2 className="modal-header">Upload Course Study Material</h2>
+            <form onSubmit={handleUploadMaterial}>
+              <div className="form-group">
+                <label className="form-label">Course / Subject</label>
+                <select className="input-field" value={matCourseId} onChange={e => setMatCourseId(e.target.value)}>
+                  {displayedCourses.map(c => (
+                    <option key={c.id} value={c.id}>[{c.academic_year === 1 ? '1st Yr' : '2nd Yr'}] {c.code}: {c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Material Title</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder="e.g. Module 1: C Pointers & Memory Architecture"
+                  value={matTitle}
+                  onChange={e => setMatTitle(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">File / Document / Resource URL</label>
+                <input
+                  type="url"
+                  className="input-field"
+                  placeholder="https://example.com/lecture_notes.pdf"
+                  value={matUrl}
+                  onChange={e => setMatUrl(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Resource Type</label>
+                <select className="input-field" value={matType} onChange={e => setMatType(e.target.value)}>
+                  <option value="pdf">📄 PDF Document / Lecture Notes</option>
+                  <option value="doc">📝 Word / Text Document</option>
+                  <option value="slides">📊 Presentation Slides</option>
+                  <option value="link">🔗 External Reference Link / Repository</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Description / Summary</label>
+                <textarea
+                  className="input-field"
+                  rows="3"
+                  placeholder="Briefly describe what students will learn from this material..."
+                  value={matDesc}
+                  onChange={e => setMatDesc(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowMaterialModal(false)}
+                  style={{ padding: '8px 16px', background: '#e5e3dc', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary" disabled={uploadingMat}>
+                  {uploadingMat ? 'Uploading...' : 'Publish Material'}
                 </button>
               </div>
             </form>

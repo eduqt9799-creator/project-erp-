@@ -139,6 +139,20 @@ db.serialize(() => {
     )
   `);
 
+  // Materials Table (Lecture Notes, PDFs, Syllabus, Resources)
+  db.run(`
+    CREATE TABLE IF NOT EXISTS materials (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      course_id INTEGER NOT NULL,
+      uploaded_by INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT,
+      file_url TEXT NOT NULL,
+      file_type TEXT DEFAULT 'pdf',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
   db.run('PRAGMA foreign_keys = ON');
 
   // Seed Default Data if Departments table is empty
@@ -264,6 +278,12 @@ db.serialize(() => {
       db.run(`INSERT INTO announcements (department_id, author_id, title, content, target_role, academic_year) VALUES 
         (1, 2, 'Welcome 1st Year CSE Students — Orientation 2026', 'All 1st Year CSE undergraduates are invited to attend the annual department induction program in Turing Auditorium.', 'all', 1),
         (1, 2, '2nd Year Research & Project Allocations', '2nd Year students must submit their choice of faculty project advisors by Friday.', 'all', 2)
+      `);
+
+      // Course Materials
+      db.run(`INSERT INTO materials (course_id, uploaded_by, title, description, file_url, file_type) VALUES
+        (1, 3, 'CSE-101 Module 1: C Pointers & Memory Architecture Notes', 'Comprehensive lecture notes on pointers, stack/heap allocation, and dynamic arrays.', 'https://raw.githubusercontent.com/alexandria-erp/docs/main/c_pointers_guide.pdf', 'pdf'),
+        (3, 3, 'CSE-201 Advanced Data Structures Reference Manual', 'Self-balancing trees, B-Trees, and Graph Algorithms reference sheet.', 'https://raw.githubusercontent.com/alexandria-erp/docs/main/ds_manual.pdf', 'pdf')
       `);
 
       // Attendance

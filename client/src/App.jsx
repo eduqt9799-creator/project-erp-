@@ -115,19 +115,19 @@ export default function App() {
 
         {/* Dynamic Portal View based on User Role & Department */}
         {currentUser.role === 'student' && (
-          <StudentPortal stats={dashboardStats} user={currentUser} activeTab={activeTab} />
+          <StudentPortal stats={dashboardStats} user={currentUser} activeTab={activeTab} onProfileUpdated={handleProfileUpdated} onRefresh={fetchDashboardStats} />
         )}
 
         {currentUser.role === 'teacher' && (
-          <TeacherPortal stats={dashboardStats} user={currentUser} activeTab={activeTab} />
+          <TeacherPortal stats={dashboardStats} user={currentUser} activeTab={activeTab} onProfileUpdated={handleProfileUpdated} onRefresh={fetchDashboardStats} />
         )}
 
         {currentUser.role === 'hod' && (
-          <HodPortal stats={dashboardStats} user={currentUser} activeTab={activeTab} />
+          <HodPortal stats={dashboardStats} user={currentUser} activeTab={activeTab} onProfileUpdated={handleProfileUpdated} onRefresh={fetchDashboardStats} />
         )}
 
         {currentUser.role === 'admin' && (
-          <AdminPortal stats={dashboardStats} user={currentUser} activeTab={activeTab} />
+          <AdminPortal stats={dashboardStats} user={currentUser} activeTab={activeTab} onProfileUpdated={handleProfileUpdated} onRefresh={fetchDashboardStats} />
         )}
 
         {/* Footer (Matches Screenshot) */}

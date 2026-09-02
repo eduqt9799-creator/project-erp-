@@ -336,6 +336,13 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
         return { ...st, percentage: pct, is_low: pct < 75 };
       });
 
+      const materials = await dbAll(
+        `SELECT m.*, c.code as course_code, c.name as course_name, u.name as uploader_name
+         FROM materials m JOIN courses c ON m.course_id = c.id LEFT JOIN users u ON m.uploaded_by = u.id
+         WHERE c.department_id = ? ORDER BY m.created_at DESC`,
+        [department_id]
+      );
+
       return res.json({
         role: 'hod',
         department: dept,
@@ -346,7 +353,8 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
         students,
         courses,
         announcements,
-        studentAttendanceReports
+        studentAttendanceReports,
+        materials
       });
     }
 
@@ -389,6 +397,13 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
         [department_id]
       );
 
+      const materials = await dbAll(
+        `SELECT m.*, c.code as course_code, c.name as course_name, u.name as uploader_name
+         FROM materials m JOIN courses c ON m.course_id = c.id LEFT JOIN users u ON m.uploaded_by = u.id
+         WHERE c.department_id = ? ORDER BY m.created_at DESC`,
+        [department_id]
+      );
+
       return res.json({
         role: 'teacher',
         department: dept,
@@ -397,7 +412,8 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
         deptStudents,
         assignments,
         announcements,
-        recentAttendance
+        recentAttendance,
+        materials
       });
     }
 
@@ -471,6 +487,13 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
         [department_id]
       );
 
+      const materials = await dbAll(
+        `SELECT m.*, c.code as course_code, c.name as course_name, u.name as uploader_name
+         FROM materials m JOIN courses c ON m.course_id = c.id LEFT JOIN users u ON m.uploaded_by = u.id
+         WHERE c.department_id = ? ORDER BY m.created_at DESC`,
+        [department_id]
+      );
+
       return res.json({
         role: 'student',
         department: dept,
@@ -484,7 +507,8 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
         totalPresent,
         grades,
         announcements,
-        teachersList
+        teachersList,
+        materials
       });
     }
 
@@ -531,8 +555,8 @@ app.post('/api/courses', authenticateToken, requireRole('hod', 'admin'), async (
     }
 
     const result = await dbRun(
-      `INSERT INTO courses (code, name, department_id, teacher_id, credits, semester) VALUES (?, ?, ?, ?, ?, ?)`,
-      [code, name, deptId, teacher_id || null, credits || 3, semester || 'Fall 2026']
+      `INSERT INTO courses (code, name, department_id, teacher_id, credits, semester, academic_year) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [code, name, deptId, teacher_id || null, credits || 3, semester || 'Fall 2026', req.body.academic_year || 1]
     );
     res.status(201).json({ id: result.lastID, message: 'Course created successfully' });
   } catch (err) {
@@ -1068,6 +1092,139 @@ app.post('/api/attendance/bulk', authenticateToken, requireRole('teacher', 'hod'
     res.json({ message: `Attendance saved for ${records.length} students on ${date}` });
   } catch (err) {
     res.status(500).json({ error: 'Failed to save attendance' });
+  }
+});
+
+// Bulk Past Attendance CSV / Matrix Import (Past 2 Months Support)
+app.post('/api/attendance/import', authenticateToken, requireRole('teacher', 'hod', 'admin'), async (req, res) => {
+  const { course_id, records } = req.body;
+
+  if (!course_id || !Array.isArray(records) || records.length === 0) {
+    return res.status(400).json({ error: 'Please provide course_id and an array of attendance records' });
+  }
+
+  const validStatuses = ['present', 'absent', 'late'];
+
+  try {
+    const deptStudents = await dbAll(
+      `SELECT u.id, u.email, p.roll_number FROM users u LEFT JOIN profiles p ON u.id = p.user_id WHERE u.role = 'student'`
+    );
+
+    const rollMap = new Map();
+    const emailMap = new Map();
+
+    deptStudents.forEach(s => {
+      if (s.roll_number) rollMap.set(s.roll_number.trim().toLowerCase(), s.id);
+      if (s.email) emailMap.set(s.email.trim().toLowerCase(), s.id);
+    });
+
+    let successCount = 0;
+    let skippedCount = 0;
+    const datesProcessed = new Set();
+
+    for (const item of records) {
+      let studentId = item.student_id ? Number(item.student_id) : null;
+
+      if (!studentId && item.roll_number) {
+        studentId = rollMap.get(item.roll_number.trim().toLowerCase());
+      }
+      if (!studentId && item.email) {
+        studentId = emailMap.get(item.email.trim().toLowerCase());
+      }
+
+      const status = (item.status || 'present').toLowerCase();
+      const dateStr = item.date ? item.date.trim() : null;
+
+      if (!studentId || !dateStr || !validStatuses.includes(status)) {
+        skippedCount++;
+        continue;
+      }
+
+      await dbRun(
+        `INSERT INTO attendance (course_id, student_id, date, status)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(course_id, student_id, date) DO UPDATE SET status = excluded.status`,
+        [course_id, studentId, dateStr, status]
+      );
+
+      datesProcessed.add(dateStr);
+      successCount++;
+    }
+
+    res.json({
+      message: `Successfully imported ${successCount} past attendance records across ${datesProcessed.size} distinct session dates! (${skippedCount} skipped/invalid)`,
+      successCount,
+      skippedCount,
+      datesCount: datesProcessed.size
+    });
+  } catch (err) {
+    console.error('Import attendance error:', err);
+    res.status(500).json({ error: 'Failed to import bulk attendance records' });
+  }
+});
+
+// ==========================================
+// COURSE MATERIALS API
+// ==========================================
+
+// Get Materials
+app.get('/api/materials', authenticateToken, async (req, res) => {
+  const { department_id, role } = req.user;
+  const { course_id } = req.query;
+
+  try {
+    let sql, params;
+    if (course_id) {
+      sql = `SELECT m.*, c.code as course_code, c.name as course_name, u.name as uploader_name
+             FROM materials m JOIN courses c ON m.course_id = c.id LEFT JOIN users u ON m.uploaded_by = u.id
+             WHERE m.course_id = ? ORDER BY m.created_at DESC`;
+      params = [course_id];
+    } else if (role === 'admin') {
+      sql = `SELECT m.*, c.code as course_code, c.name as course_name, u.name as uploader_name
+             FROM materials m JOIN courses c ON m.course_id = c.id LEFT JOIN users u ON m.uploaded_by = u.id ORDER BY m.created_at DESC`;
+      params = [];
+    } else {
+      sql = `SELECT m.*, c.code as course_code, c.name as course_name, u.name as uploader_name
+             FROM materials m JOIN courses c ON m.course_id = c.id LEFT JOIN users u ON m.uploaded_by = u.id
+             WHERE c.department_id = ? ORDER BY m.created_at DESC`;
+      params = [department_id];
+    }
+    const materials = await dbAll(sql, params);
+    res.json(materials);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch course materials' });
+  }
+});
+
+// Upload Material (Teacher, HOD, Admin)
+app.post('/api/materials', authenticateToken, requireRole('teacher', 'hod', 'admin'), async (req, res) => {
+  const { course_id, title, description, file_url, file_type } = req.body;
+
+  if (!course_id || !title || !file_url) {
+    return res.status(400).json({ error: 'course_id, title, and file_url are required' });
+  }
+
+  try {
+    const result = await dbRun(
+      `INSERT INTO materials (course_id, uploaded_by, title, description, file_url, file_type) VALUES (?, ?, ?, ?, ?, ?)`,
+      [course_id, req.user.id, title, description || '', file_url, file_type || 'pdf']
+    );
+    res.status(201).json({ id: result.lastID, message: 'Course material uploaded successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to upload material' });
+  }
+});
+
+// Delete Material (Teacher, HOD, Admin)
+app.delete('/api/materials/:id', authenticateToken, requireRole('teacher', 'hod', 'admin'), async (req, res) => {
+  try {
+    const mat = await dbGet('SELECT * FROM materials WHERE id = ?', [req.params.id]);
+    if (!mat) return res.status(404).json({ error: 'Material not found' });
+
+    await dbRun('DELETE FROM materials WHERE id = ?', [req.params.id]);
+    res.json({ message: 'Course material deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete material' });
   }
 });
 

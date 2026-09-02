@@ -3,7 +3,7 @@ import { GraduationCap, Users, Shield, PlusCircle, Building, Trash2 } from 'luci
 import SettingsTab from './SettingsTab';
 import YearSelector from './YearSelector';
 
-export default function AdminPortal({ stats, user, activeTab }) {
+export default function AdminPortal({ stats, user, activeTab, onProfileUpdated }) {
   const [selectedYear, setSelectedYear] = useState(0); // 0 = All, 1 = 1st Year, 2 = 2nd Year
   const [allUsers, setAllUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
@@ -313,7 +313,7 @@ export default function AdminPortal({ stats, user, activeTab }) {
 
       {/* 5. DEDICATED TAB: PROFILE SETTINGS */}
       {activeTab === 'settings' && (
-        <SettingsTab user={user} />
+        <SettingsTab user={user} onProfileUpdated={onProfileUpdated} />
       )}
 
       {/* Admin Create User Modal */}

@@ -6,7 +6,7 @@ export default function YearSelector({ selectedYear, onSelectYear, firstYearCoun
     <div style={{
       display: 'flex',
       alignItems: 'center',
-      justify: 'space-between',
+      justifyContent: 'space-between',
       backgroundColor: '#ffffff',
       border: '1px solid #e2dfd7',
       borderRadius: '8px',

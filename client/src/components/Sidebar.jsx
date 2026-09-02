@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Users, BookOpen, BarChart3, Settings, LogOut, ShieldAlert, GraduationCap, CheckSquare } from 'lucide-react';
+import { LayoutDashboard, Users, BookOpen, BarChart3, Settings, LogOut, ShieldAlert, GraduationCap, CheckSquare, FileText } from 'lucide-react';
 
 export default function Sidebar({ currentUser, activeTab, setActiveTab, onLogout }) {
   if (!currentUser) return null;
@@ -61,6 +61,13 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab, onLogout
                 <span>My CSE Courses</span>
               </div>
               <div 
+                className={`nav-item ${activeTab === 'materials' ? 'active' : ''}`}
+                onClick={() => setActiveTab('materials')}
+              >
+                <FileText />
+                <span>Course Materials</span>
+              </div>
+              <div 
                 className={`nav-item ${activeTab === 'directory' ? 'active' : ''}`}
                 onClick={() => setActiveTab('directory')}
               >
@@ -84,7 +91,7 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab, onLogout
                 onClick={() => setActiveTab('attendance')}
               >
                 <CheckSquare />
-                <span>Take Attendance</span>
+                <span>Take & Import Attendance</span>
               </div>
               <div 
                 className={`nav-item ${activeTab === 'students' ? 'active' : ''}`}
@@ -99,6 +106,13 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab, onLogout
               >
                 <BookOpen />
                 <span>Academic Control</span>
+              </div>
+              <div 
+                className={`nav-item ${activeTab === 'materials' ? 'active' : ''}`}
+                onClick={() => setActiveTab('materials')}
+              >
+                <FileText />
+                <span>Course Materials & Uploads</span>
               </div>
               <div 
                 className={`nav-item ${activeTab === 'grading' ? 'active' : ''}`}
@@ -132,6 +146,13 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab, onLogout
               >
                 <BookOpen />
                 <span>Curriculum & Syllabi</span>
+              </div>
+              <div 
+                className={`nav-item ${activeTab === 'materials' ? 'active' : ''}`}
+                onClick={() => setActiveTab('materials')}
+              >
+                <FileText />
+                <span>Course Materials</span>
               </div>
             </>
           )}

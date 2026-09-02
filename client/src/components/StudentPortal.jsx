@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { BookOpen, Calendar, Clock, Award, FileText, CheckCircle, Send, Users, AlertCircle } from 'lucide-react';
+import { BookOpen, Calendar, Clock, Award, FileText, CheckCircle, Send, Users, AlertCircle, FolderDown } from 'lucide-react';
 import SettingsTab from './SettingsTab';
 
-export default function StudentPortal({ stats, user, activeTab }) {
+export default function StudentPortal({ stats, user, activeTab, onProfileUpdated }) {
   const [selectedAssignment, setSelectedAssignment] = useState(null);
   const [submissionText, setSubmissionText] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -13,7 +13,7 @@ export default function StudentPortal({ stats, user, activeTab }) {
   const { 
     department, enrolledCourses, hod, assignments, attendanceRecords, 
     courseAttendanceBreakdown, overallPercentage, totalClasses, totalPresent, 
-    grades, announcements, teachersList 
+    grades, announcements, teachersList, materials = [] 
   } = stats;
 
   const handleAssignmentSubmit = async (e) => {
@@ -378,9 +378,58 @@ export default function StudentPortal({ stats, user, activeTab }) {
         </div>
       )}
 
+      {/* DEDICATED TAB: COURSE MATERIALS */}
+      {activeTab === 'materials' && (
+        <div className="dashboard-grid">
+          <div className="card-white" style={{ gridColumn: 'span 12' }}>
+            <h2 className="card-white-title">CSE Academic Materials & Reference Notes</h2>
+            <p style={{ fontSize: '14px', color: '#666', marginBottom: '24px' }}>
+              Lecture notes, laboratory manuals, and course reference documents uploaded by your professors.
+            </p>
+
+            {materials.length === 0 ? (
+              <p style={{ color: '#777', fontSize: '13px' }}>No study materials published for your enrolled courses yet.</p>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
+                {materials.map(mat => (
+                  <div key={mat.id} style={{ border: '1px solid #ddd9cf', borderRadius: '8px', padding: '20px', backgroundColor: '#faf9f6', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                        <span style={{ fontSize: '12px', fontWeight: 700, background: '#0f4c81', color: '#fff', padding: '4px 8px', borderRadius: '4px' }}>
+                          {mat.course_code}
+                        </span>
+                        <span style={{ fontSize: '11px', color: '#777', textTransform: 'uppercase', fontWeight: 700 }}>
+                          {mat.file_type || 'PDF'}
+                        </span>
+                      </div>
+                      <h3 style={{ fontFamily: 'Playfair Display, serif', fontSize: '18px', fontWeight: 700, marginBottom: '8px' }}>{mat.title}</h3>
+                      <p style={{ fontSize: '13px', color: '#555', lineHeight: 1.4 }}>{mat.description}</p>
+                    </div>
+
+                    <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid #eae8e3', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ fontSize: '12px', color: '#666' }}>
+                        Uploaded by: <strong>{mat.uploader_name || 'Faculty'}</strong>
+                      </div>
+                      <a
+                        href={mat.file_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ padding: '6px 14px', background: '#0d2847', color: '#fff', borderRadius: '6px', fontSize: '12px', fontWeight: 700, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}
+                      >
+                        <FolderDown size={14} /> Open Material
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* 6. DEDICATED TAB: PROFILE SETTINGS */}
       {activeTab === 'settings' && (
-        <SettingsTab user={user} />
+        <SettingsTab user={user} onProfileUpdated={onProfileUpdated} />
       )}
 
       {/* Assignment Submission Modal */}
