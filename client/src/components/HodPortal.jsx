@@ -52,6 +52,25 @@ export default function HodPortal({ stats, user, activeTab, onProfileUpdated, on
   const [creatingCourse, setCreatingCourse] = useState(false);
   const [courseMsg, setCourseMsg] = useState('');
 
+  // HOD Profile edit state
+  const [showHodProfileModal, setShowHodProfileModal] = useState(false);
+  const [hodName, setHodName] = useState(user?.name || '');
+  const [hodPhone, setHodPhone] = useState(user?.profile?.phone || '');
+  const [hodBio, setHodBio] = useState(user?.profile?.bio || '');
+  const [hodOffice, setHodOffice] = useState(user?.profile?.office_room || '');
+  const [hodEmpId, setHodEmpId] = useState(user?.profile?.employee_id || '');
+  const [hodDesignation, setHodDesignation] = useState(user?.profile?.designation || 'Head of Department');
+  const [hodSpecialization, setHodSpecialization] = useState(user?.profile?.specialization || 'Computer Science');
+  const [savingHodProfile, setSavingHodProfile] = useState(false);
+
+  // Attendance Tab & Past 2-Month CSV Import state
+  const [attTabMode, setAttTabMode] = useState('roster'); // 'roster' or 'import'
+  const [csvRawInput, setCsvRawInput] = useState('');
+  const [importCourseId, setImportCourseId] = useState(1);
+  const [parsedImportRecords, setParsedImportRecords] = useState([]);
+  const [importingCsv, setImportingCsv] = useState(false);
+  const [importMsg, setImportMsg] = useState('');
+
   if (!stats) return <div style={{ color: '#aaa', padding: '40px' }}>Loading CSE HOD Portal...</div>;
 
   const { department, teachersCount, studentsCount, coursesCount, teachers, students, courses, announcements, studentAttendanceReports, materials = [] } = stats;
@@ -124,6 +143,132 @@ export default function HodPortal({ stats, user, activeTab, onProfileUpdated, on
       if (onRefresh) onRefresh();
     } catch (err) {
       alert(err.message);
+    }
+  };
+
+  const handleUpdateHodProfile = async (e) => {
+    e.preventDefault();
+    setSavingHodProfile(true);
+    const token = localStorage.getItem('alexandria_token');
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: hodName,
+          phone: hodPhone,
+          bio: hodBio,
+          office_room: hodOffice,
+          employee_id: hodEmpId,
+          designation: hodDesignation,
+          specialization: hodSpecialization
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to update profile');
+
+      alert('HOD Profile updated successfully!');
+      setShowHodProfileModal(false);
+      if (onProfileUpdated) onProfileUpdated(data.user);
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSavingHodProfile(false);
+    }
+  };
+
+  const handleParseCsv = (rawText) => {
+    if (!rawText || !rawText.trim()) {
+      setParsedImportRecords([]);
+      return;
+    }
+    const lines = rawText.split(/\r?\n/);
+    const parsed = [];
+    lines.forEach((line) => {
+      if (!line.trim()) return;
+      const parts = line.split(',').map(p => p.trim().replace(/^["']|["']$/g, ''));
+      if (parts.length >= 3) {
+        if (parts[0].toLowerCase().includes('roll') || parts[0].toLowerCase().includes('student')) return;
+        const roll_number = parts[0];
+        const date = parts[1];
+        const status = parts[2].toLowerCase();
+        if (roll_number && date && ['present', 'absent', 'late'].includes(status)) {
+          parsed.push({ roll_number, date, status });
+        }
+      }
+    });
+    setParsedImportRecords(parsed);
+  };
+
+  const handleGenerateSampleCsv = () => {
+    const today = new Date();
+    const dates = [];
+    for (let i = 60; i >= 1; i--) {
+      const d = new Date();
+      d.setDate(today.getDate() - i);
+      if (d.getDay() !== 0 && d.getDay() !== 6) {
+        dates.push(d.toISOString().split('T')[0]);
+      }
+    }
+    let csv = 'Roll_Number,Date,Status\n';
+    displayedStudents.forEach(st => {
+      const roll = st.roll_number || st.email;
+      dates.slice(0, 10).forEach(dt => {
+        csv += `${roll},${dt},present\n`;
+      });
+    });
+    setCsvRawInput(csv);
+    handleParseCsv(csv);
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target.result;
+      setCsvRawInput(text);
+      handleParseCsv(text);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleExecuteImport = async (e) => {
+    e.preventDefault();
+    if (parsedImportRecords.length === 0) {
+      alert('Please enter or upload valid CSV attendance records before importing.');
+      return;
+    }
+    setImportingCsv(true);
+    const token = localStorage.getItem('alexandria_token');
+    try {
+      const res = await fetch('/api/attendance/import', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          course_id: Number(importCourseId || displayedCourses[0]?.id || 1),
+          records: parsedImportRecords
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Import failed');
+
+      setImportMsg(`🎉 ${data.message}`);
+      setCsvRawInput('');
+      setParsedImportRecords([]);
+      if (onRefresh) onRefresh();
+      setTimeout(() => setImportMsg(''), 5000);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setImportingCsv(false);
     }
   };
 
@@ -391,13 +536,45 @@ export default function HodPortal({ stats, user, activeTab, onProfileUpdated, on
     <div>
       {/* Welcome Banner */}
       <div className="welcome-hero">
-        <div className="dept-pill">
-          👔 HOD Executive Portal • {department?.code || 'CSE'} Department
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+          <div>
+            <div className="dept-pill">
+              👔 HOD Executive Portal • {department?.code || 'CSE'} Department
+            </div>
+            <h1 className="welcome-title">Welcome back, {user?.name || 'Dr. Arun'}.</h1>
+            <p className="welcome-subtitle">
+              Head of Department Administration for {department?.name || 'Computer Science & Engineering'}. Manage department faculty, student enrollment, and academic policy.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              setHodName(user?.name || '');
+              setHodPhone(user?.profile?.phone || '');
+              setHodBio(user?.profile?.bio || '');
+              setHodOffice(user?.profile?.office_room || '');
+              setHodEmpId(user?.profile?.employee_id || '');
+              setHodDesignation(user?.profile?.designation || 'Head of Department');
+              setHodSpecialization(user?.profile?.specialization || 'Computer Science');
+              setShowHodProfileModal(true);
+            }}
+            style={{
+              padding: '10px 18px',
+              backgroundColor: '#0d2847',
+              color: '#ffffff',
+              border: '1px solid #1e3a5f',
+              borderRadius: '8px',
+              fontWeight: 700,
+              fontSize: '13px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+            }}
+          >
+            <Edit size={16} /> Edit HOD Profile
+          </button>
         </div>
-        <h1 className="welcome-title">Welcome back, {user?.name || 'Dr. Arun'}.</h1>
-        <p className="welcome-subtitle">
-          Head of Department Administration for {department?.name || 'Computer Science & Engineering'}. Manage department faculty, student enrollment, and academic policy.
-        </p>
       </div>
 
       {/* 1. MAIN DASHBOARD HOME TAB */}
@@ -563,85 +740,235 @@ export default function HodPortal({ stats, user, activeTab, onProfileUpdated, on
             title="Class Attendance Year Filter"
           />
           <div className="dashboard-grid">
-          {/* Low Attendance Alert Banner */}
-          <div className="card-white" style={{ gridColumn: 'span 12' }}>
-            <h2 className="card-white-title" style={{ color: '#b91c1c', marginBottom: '8px' }}>
-              ⚠️ Low Attendance Alerts (&lt; 75% Threshold) — {selectedYear === 0 ? 'All Batches' : `${selectedYear}${selectedYear === 1 ? 'st' : 'nd'} Year`}
-            </h2>
-            <p style={{ fontSize: '13px', color: '#666', marginBottom: '16px' }}>
-              Students in CSE requiring academic intervention due to attendance falling below institutional criteria.
-            </p>
+            <div className="card-white" style={{ gridColumn: 'span 12' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+                <div>
+                  <h2 className="card-white-title">Department Attendance &amp; Past Data Importer</h2>
+                  <p style={{ fontSize: '13px', color: '#666' }}>
+                    Monitor student attendance standing, low-attendance alerts (&lt;75%), or import past 2-month CSV attendance data.
+                  </p>
+                </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {displayedAttendanceReports?.filter(s => s.is_low).length === 0 ? (
-                <div style={{ padding: '14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', color: '#15803d', fontWeight: 600, fontSize: '13px' }}>
-                  ✓ Outstanding! No students in this batch selection are currently below the 75% attendance threshold.
+                {/* Mode Selector Toggle */}
+                <div style={{ display: 'flex', gap: '6px', background: '#f4f3ee', padding: '4px', borderRadius: '8px', border: '1px solid #ddd9cf' }}>
+                  <button
+                    type="button"
+                    onClick={() => setAttTabMode('roster')}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      border: 'none',
+                      backgroundColor: attTabMode === 'roster' ? '#0d2847' : 'transparent',
+                      color: attTabMode === 'roster' ? '#ffffff' : '#555555'
+                    }}
+                  >
+                    📊 Roster &amp; Alerts (&lt;75%)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAttTabMode('import')}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      border: 'none',
+                      backgroundColor: attTabMode === 'import' ? '#0f4c81' : 'transparent',
+                      color: attTabMode === 'import' ? '#ffffff' : '#555555'
+                    }}
+                  >
+                    📥 Import Past 2 Months CSV
+                  </button>
+                </div>
+              </div>
+
+              {importMsg && <div style={{ color: '#15803d', fontWeight: 700, padding: '12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', marginBottom: '16px' }}>{importMsg}</div>}
+
+              {attTabMode === 'import' ? (
+                /* CSV / PAST 2 MONTHS IMPORT TOOL FOR HOD */
+                <div style={{ border: '1px solid #e2dfd7', borderRadius: '10px', padding: '24px', backgroundColor: '#faf9f6' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+                    <div>
+                      <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#0d2847' }}>HOD Past Attendance Importer (Past 2 Months)</h3>
+                      <p style={{ fontSize: '13px', color: '#666', marginTop: '4px' }}>
+                        Paste attendance CSV rows or upload a file. Format: <code>Roll_Number, YYYY-MM-DD, Status (present/absent/late)</code>
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleGenerateSampleCsv}
+                      style={{ padding: '8px 14px', background: '#eef4fb', color: '#0f4c81', border: '1px solid #bfdbfe', borderRadius: '6px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      <Sparkles size={14} /> Generate Pre-filled Student Roster Template
+                    </button>
+                  </div>
+
+                  <form onSubmit={handleExecuteImport}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                      <div>
+                        <label className="form-label">Select Target Subject / Course</label>
+                        <select className="input-field" value={importCourseId} onChange={e => setImportCourseId(e.target.value)}>
+                          {displayedCourses.map(c => (
+                            <option key={c.id} value={c.id}>[{c.academic_year === 1 ? '1st Yr' : '2nd Yr'}] {c.code}: {c.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="form-label">Upload Attendance CSV File (.csv / .txt)</label>
+                        <input
+                          type="file"
+                          accept=".csv,.txt"
+                          onChange={handleFileUpload}
+                          className="input-field"
+                          style={{ padding: '6px' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">Or Paste CSV Raw Content (Roll_Number, Date, Status)</label>
+                      <textarea
+                        className="input-field"
+                        rows="7"
+                        style={{ fontFamily: 'monospace', fontSize: '12px' }}
+                        placeholder="CSE-1Y-2025-001, 2026-07-01, present&#10;CSE-1Y-2025-001, 2026-07-02, present&#10;CSE-1Y-2025-002, 2026-07-01, absent"
+                        value={csvRawInput}
+                        onChange={e => {
+                          setCsvRawInput(e.target.value);
+                          handleParseCsv(e.target.value);
+                        }}
+                      />
+                    </div>
+
+                    {/* Preview Table */}
+                    {parsedImportRecords.length > 0 && (
+                      <div style={{ marginBottom: '20px', padding: '16px', background: '#ffffff', border: '1px solid #ddd9cf', borderRadius: '8px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                          <span style={{ fontSize: '13px', fontWeight: 700, color: '#15803d' }}>
+                            ✓ Parsed {parsedImportRecords.length} Attendance Entries Ready for Database Sync
+                          </span>
+                        </div>
+                        <div style={{ maxHeight: '180px', overflowY: 'auto' }}>
+                          <table style={{ width: '100%', fontSize: '12px', textAlign: 'left', borderCollapse: 'collapse' }}>
+                            <thead>
+                              <tr style={{ borderBottom: '1px solid #ccc', color: '#555' }}>
+                                <th style={{ padding: '6px' }}>Roll Number</th>
+                                <th style={{ padding: '6px' }}>Session Date</th>
+                                <th style={{ padding: '6px' }}>Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {parsedImportRecords.slice(0, 10).map((r, i) => (
+                                <tr key={i} style={{ borderBottom: '1px solid #eee' }}>
+                                  <td style={{ padding: '6px', fontWeight: 600 }}>{r.roll_number}</td>
+                                  <td style={{ padding: '6px' }}>{r.date}</td>
+                                  <td style={{ padding: '6px', textTransform: 'capitalize', fontWeight: 700, color: r.status === 'present' ? '#15803d' : '#b91c1c' }}>{r.status}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                          {parsedImportRecords.length > 10 && (
+                            <div style={{ fontSize: '11px', color: '#777', marginTop: '6px' }}>
+                              ... and {parsedImportRecords.length - 10} more rows
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    <button type="submit" className="btn-primary" disabled={importingCsv || parsedImportRecords.length === 0} style={{ padding: '12px 24px', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Upload size={16} /> {importingCsv ? 'Importing Attendance...' : `📥 Execute Import (${parsedImportRecords.length} Records)`}
+                    </button>
+                  </form>
                 </div>
               ) : (
-                displayedAttendanceReports?.filter(s => s.is_low).map(st => (
-                  <div key={st.student_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px', border: '1px solid #fecaca', backgroundColor: '#fef2f2', borderRadius: '8px' }}>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: '15px', color: '#991b1b' }}>{st.student_name}</div>
-                      <div style={{ fontSize: '12px', color: '#7f1d1d' }}>Roll: {st.roll_number} • Year: {st.academic_year === 1 ? '1st Year' : '2nd Year'}</div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <span style={{ fontSize: '18px', fontWeight: 800, color: '#991b1b' }}>{st.percentage}%</span>
-                      <div style={{ fontSize: '11px', color: '#991b1b' }}>{st.present_count} / {st.total_classes} sessions</div>
+                /* ROSTER AND LOW ATTENDANCE ALERTS */
+                <div>
+                  <div style={{ marginBottom: '24px' }}>
+                    <h3 style={{ color: '#b91c1c', marginBottom: '8px', fontSize: '16px', fontWeight: 700 }}>
+                      ⚠️ Low Attendance Alerts (&lt; 75% Threshold) — {selectedYear === 0 ? 'All Batches' : `${selectedYear}${selectedYear === 1 ? 'st' : 'nd'} Year`}
+                    </h3>
+                    <p style={{ fontSize: '13px', color: '#666', marginBottom: '16px' }}>
+                      Students in CSE requiring academic intervention due to attendance falling below institutional criteria.
+                    </p>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {displayedAttendanceReports?.filter(s => s.is_low).length === 0 ? (
+                        <div style={{ padding: '14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', color: '#15803d', fontWeight: 600, fontSize: '13px' }}>
+                          ✓ Outstanding! No students in this batch selection are currently below the 75% attendance threshold.
+                        </div>
+                      ) : (
+                        displayedAttendanceReports?.filter(s => s.is_low).map(st => (
+                          <div key={st.student_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px', border: '1px solid #fecaca', backgroundColor: '#fef2f2', borderRadius: '8px' }}>
+                            <div>
+                              <div style={{ fontWeight: 700, fontSize: '15px', color: '#991b1b' }}>{st.student_name}</div>
+                              <div style={{ fontSize: '12px', color: '#7f1d1d' }}>Roll: {st.roll_number} • Year: {st.academic_year === 1 ? '1st Year' : '2nd Year'}</div>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                              <span style={{ fontSize: '18px', fontWeight: 800, color: '#991b1b' }}>{st.percentage}%</span>
+                              <div style={{ fontSize: '11px', color: '#991b1b' }}>{st.present_count} / {st.total_classes} sessions</div>
+                            </div>
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
-                ))
+
+                  <div>
+                    <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '16px' }}>
+                      Department Class Attendance Roster Report ({selectedYear === 0 ? 'All Batches' : `${selectedYear}${selectedYear === 1 ? 'st' : 'nd'} Year`})
+                    </h3>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '2px solid #ddd9cf', color: '#555' }}>
+                          <th style={{ padding: '10px' }}>Student Name</th>
+                          <th style={{ padding: '10px' }}>Academic Year</th>
+                          <th style={{ padding: '10px' }}>Roll Number</th>
+                          <th style={{ padding: '10px' }}>Attended / Total Sessions</th>
+                          <th style={{ padding: '10px' }}>Attendance Percentage</th>
+                          <th style={{ padding: '10px' }}>Standing Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {displayedAttendanceReports?.map(st => (
+                          <tr key={st.student_id} style={{ borderBottom: '1px solid #eae8e3' }}>
+                            <td style={{ padding: '10px', fontWeight: 600 }}>{st.student_name}</td>
+                            <td style={{ padding: '10px' }}>
+                              <span style={{ fontSize: '11px', background: st.academic_year === 1 ? '#eef4fb' : '#fef3c7', color: st.academic_year === 1 ? '#0f4c81' : '#b45309', padding: '3px 8px', borderRadius: '4px', fontWeight: 700 }}>
+                                {st.academic_year === 1 ? '1st Year' : '2nd Year'}
+                              </span>
+                            </td>
+                            <td style={{ padding: '10px', color: '#666' }}>{st.roll_number}</td>
+                            <td style={{ padding: '10px' }}>{st.present_count} / {st.total_classes}</td>
+                            <td style={{ padding: '10px', fontWeight: 700, color: st.percentage < 75 ? '#b91c1c' : '#15803d' }}>
+                              {st.percentage}%
+                            </td>
+                            <td style={{ padding: '10px' }}>
+                              <span style={{
+                                padding: '4px 10px',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                backgroundColor: st.percentage < 75 ? '#fef2f2' : '#eefbe7',
+                                color: st.percentage < 75 ? '#b91c1c' : '#15803d'
+                              }}>
+                                {st.percentage < 75 ? 'Low Attendance' : 'Good Standing'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               )}
             </div>
           </div>
-
-          {/* All Department Students Attendance Report */}
-          <div className="card-white" style={{ gridColumn: 'span 12' }}>
-            <h2 className="card-white-title" style={{ marginBottom: '16px' }}>
-              Department Class Attendance Roster Report ({selectedYear === 0 ? 'All Batches' : `${selectedYear}${selectedYear === 1 ? 'st' : 'nd'} Year`})
-            </h2>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
-              <thead>
-                <tr style={{ borderBottom: '2px solid #ddd9cf', color: '#555' }}>
-                  <th style={{ padding: '10px' }}>Student Name</th>
-                  <th style={{ padding: '10px' }}>Academic Year</th>
-                  <th style={{ padding: '10px' }}>Roll Number</th>
-                  <th style={{ padding: '10px' }}>Attended / Total Sessions</th>
-                  <th style={{ padding: '10px' }}>Attendance Percentage</th>
-                  <th style={{ padding: '10px' }}>Standing Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayedAttendanceReports?.map(st => (
-                  <tr key={st.student_id} style={{ borderBottom: '1px solid #eae8e3' }}>
-                    <td style={{ padding: '10px', fontWeight: 600 }}>{st.student_name}</td>
-                    <td style={{ padding: '10px' }}>
-                      <span style={{ fontSize: '11px', background: st.academic_year === 1 ? '#eef4fb' : '#fef3c7', color: st.academic_year === 1 ? '#0f4c81' : '#b45309', padding: '3px 8px', borderRadius: '4px', fontWeight: 700 }}>
-                        {st.academic_year === 1 ? '1st Year' : '2nd Year'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '10px', color: '#666' }}>{st.roll_number}</td>
-                    <td style={{ padding: '10px' }}>{st.present_count} / {st.total_classes}</td>
-                    <td style={{ padding: '10px', fontWeight: 700, color: st.percentage < 75 ? '#b91c1c' : '#15803d' }}>
-                      {st.percentage}%
-                    </td>
-                    <td style={{ padding: '10px' }}>
-                      <span style={{
-                        padding: '4px 10px',
-                        borderRadius: '4px',
-                        fontSize: '11px',
-                        fontWeight: 700,
-                        backgroundColor: st.percentage < 75 ? '#fef2f2' : '#eefbe7',
-                        color: st.percentage < 75 ? '#b91c1c' : '#15803d'
-                      }}>
-                        {st.percentage < 75 ? 'Low Attendance' : 'Good Standing'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
         </div>
       )}
 
@@ -1222,6 +1549,104 @@ export default function HodPortal({ stats, user, activeTab, onProfileUpdated, on
                 </button>
                 <button type="submit" className="btn-primary" disabled={uploadingMat}>
                   {uploadingMat ? 'Uploading...' : 'Publish Material'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT HOD PROFILE MODAL */}
+      {showHodProfileModal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h2 className="modal-header">Edit HOD Institutional Profile</h2>
+            <form onSubmit={handleUpdateHodProfile}>
+              <div className="form-group">
+                <label className="form-label">Full Name &amp; Title</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  value={hodName}
+                  onChange={e => setHodName(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="form-group">
+                  <label className="form-label">Designation / Official Role</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={hodDesignation}
+                    onChange={e => setHodDesignation(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Employee ID</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={hodEmpId}
+                    onChange={e => setHodEmpId(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="form-group">
+                  <label className="form-label">Office Room / Suite</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={hodOffice}
+                    onChange={e => setHodOffice(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Contact Phone</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={hodPhone}
+                    onChange={e => setHodPhone(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Specialization Area</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  value={hodSpecialization}
+                  onChange={e => setHodSpecialization(e.target.value)}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Academic Biography &amp; Statement</label>
+                <textarea
+                  className="input-field"
+                  rows="4"
+                  value={hodBio}
+                  onChange={e => setHodBio(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowHodProfileModal(false)}
+                  style={{ padding: '8px 16px', background: '#e5e3dc', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary" disabled={savingHodProfile}>
+                  {savingHodProfile ? 'Saving...' : 'Save HOD Profile'}
                 </button>
               </div>
             </form>

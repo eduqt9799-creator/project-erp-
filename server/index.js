@@ -881,7 +881,7 @@ app.get('/api/announcements', authenticateToken, async (req, res) => {
 
 // Create Announcement (Teacher, HOD, Admin)
 app.post('/api/announcements', authenticateToken, requireRole('teacher', 'hod', 'admin'), async (req, res) => {
-  const { title, content, target_role, department_id } = req.body;
+  const { title, content, target_role, department_id, academic_year } = req.body;
   const deptId = req.user.role === 'admin' ? (department_id || req.user.department_id) : req.user.department_id;
   const authorId = req.user.id;
 
@@ -891,8 +891,8 @@ app.post('/api/announcements', authenticateToken, requireRole('teacher', 'hod', 
 
   try {
     const result = await dbRun(
-      `INSERT INTO announcements (department_id, author_id, title, content, target_role) VALUES (?, ?, ?, ?, ?)`,
-      [deptId, authorId, title, content, target_role || 'all']
+      `INSERT INTO announcements (department_id, author_id, title, content, target_role, academic_year) VALUES (?, ?, ?, ?, ?, ?)`,
+      [deptId, authorId, title, content, target_role || 'all', Number(academic_year || 0)]
     );
     res.status(201).json({ id: result.lastID, message: 'Announcement broadcasted successfully' });
   } catch (err) {
@@ -903,7 +903,7 @@ app.post('/api/announcements', authenticateToken, requireRole('teacher', 'hod', 
 // Edit Announcement (HOD, Admin)
 app.put('/api/announcements/:id', authenticateToken, requireRole('hod', 'admin'), async (req, res) => {
   const { role, department_id } = req.user;
-  const { title, content, target_role } = req.body;
+  const { title, content, target_role, academic_year } = req.body;
 
   if (!title || !content) {
     return res.status(400).json({ error: 'Title and content are required' });
@@ -918,8 +918,8 @@ app.put('/api/announcements/:id', authenticateToken, requireRole('hod', 'admin')
     }
 
     await dbRun(
-      `UPDATE announcements SET title = ?, content = ?, target_role = ? WHERE id = ?`,
-      [title, content, target_role || 'all', req.params.id]
+      `UPDATE announcements SET title = ?, content = ?, target_role = ?, academic_year = ? WHERE id = ?`,
+      [title, content, target_role || 'all', Number(academic_year || 0), req.params.id]
     );
     res.json({ message: 'Announcement updated successfully' });
   } catch (err) {

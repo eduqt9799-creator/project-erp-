@@ -214,7 +214,8 @@ export default function TeacherPortal({ stats, user, activeTab, onProfileUpdated
           title: noticeTitle,
           content: noticeContent,
           target_role: noticeTargetRole,
-          department_id: department?.id || 1
+          department_id: department?.id || 1,
+          academic_year: selectedYear
         })
       });
       const data = await res.json();
