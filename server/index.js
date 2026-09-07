@@ -855,7 +855,176 @@ app.post('/api/grades', authenticateToken, requireRole('teacher', 'hod', 'admin'
 });
 
 // ==========================================
-// 8. ANNOUNCEMENTS API
+// 8. COURSE MATERIALS API
+// ==========================================
+
+// Get Materials (department-scoped)
+app.get('/api/materials', authenticateToken, async (req, res) => {
+  const { department_id, role } = req.user;
+  try {
+    let materials;
+    if (role === 'admin') {
+      materials = await dbAll(
+        `SELECT m.*, c.code as course_code, c.name as course_name, u.name as uploader_name, d.code as dept_code
+         FROM materials m
+         JOIN courses c ON m.course_id = c.id
+         LEFT JOIN users u ON m.uploaded_by = u.id
+         LEFT JOIN departments d ON c.department_id = d.id
+         ORDER BY m.created_at DESC`
+      );
+    } else {
+      materials = await dbAll(
+        `SELECT m.*, c.code as course_code, c.name as course_name, u.name as uploader_name
+         FROM materials m
+         JOIN courses c ON m.course_id = c.id
+         LEFT JOIN users u ON m.uploaded_by = u.id
+         WHERE c.department_id = ?
+         ORDER BY m.created_at DESC`,
+        [department_id]
+      );
+    }
+    res.json(materials);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch course materials' });
+  }
+});
+
+// Upload Course Material (Teacher, HOD, Admin)
+app.post('/api/materials', authenticateToken, requireRole('teacher', 'hod', 'admin'), async (req, res) => {
+  const { course_id, title, description, file_url, file_type } = req.body;
+  const uploadedBy = req.user.id;
+
+  if (!course_id || !title || !file_url) {
+    return res.status(400).json({ error: 'course_id, title, and file_url are required' });
+  }
+
+  try {
+    // Verify course belongs to uploader's department (unless admin)
+    if (req.user.role !== 'admin') {
+      const course = await dbGet('SELECT id FROM courses WHERE id = ? AND department_id = ?', [course_id, req.user.department_id]);
+      if (!course) return res.status(403).json({ error: 'Course not found in your department' });
+    }
+
+    const result = await dbRun(
+      `INSERT INTO materials (course_id, uploaded_by, title, description, file_url, file_type) VALUES (?, ?, ?, ?, ?, ?)`,
+      [course_id, uploadedBy, title, description || '', file_url, file_type || 'pdf']
+    );
+    res.status(201).json({ id: result.lastID, message: 'Course material uploaded successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to upload course material' });
+  }
+});
+
+// Delete Course Material (Teacher who uploaded it, HOD, Admin)
+app.delete('/api/materials/:id', authenticateToken, requireRole('teacher', 'hod', 'admin'), async (req, res) => {
+  const { role, id: userId, department_id } = req.user;
+  try {
+    const material = await dbGet(
+      `SELECT m.*, c.department_id as course_dept_id FROM materials m JOIN courses c ON m.course_id = c.id WHERE m.id = ?`,
+      [req.params.id]
+    );
+    if (!material) return res.status(404).json({ error: 'Material not found' });
+
+    // Teachers can only delete their own uploads; HOD can delete within their dept
+    if (role === 'teacher' && material.uploaded_by !== userId) {
+      return res.status(403).json({ error: 'You can only delete materials you uploaded' });
+    }
+    if (role === 'hod' && material.course_dept_id !== department_id) {
+      return res.status(403).json({ error: 'You can only delete materials in your department' });
+    }
+
+    await dbRun('DELETE FROM materials WHERE id = ?', [req.params.id]);
+    res.json({ message: 'Course material deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete course material' });
+  }
+});
+
+// ==========================================
+// 9. BULK ATTENDANCE IMPORT API
+// ==========================================
+
+// Import Past 2-Month Attendance via CSV records (Teacher, HOD, Admin)
+app.post('/api/attendance/import', authenticateToken, requireRole('teacher', 'hod', 'admin'), async (req, res) => {
+  const { course_id, records } = req.body;
+  const { department_id, role } = req.user;
+
+  if (!course_id || !Array.isArray(records) || records.length === 0) {
+    return res.status(400).json({ error: 'course_id and a non-empty records array are required' });
+  }
+
+  try {
+    // Verify the course belongs to the requester's department
+    const course = await dbGet('SELECT id FROM courses WHERE id = ?', [course_id]);
+    if (!course) return res.status(404).json({ error: 'Course not found' });
+
+    if (role !== 'admin') {
+      const deptCourse = await dbGet('SELECT id FROM courses WHERE id = ? AND department_id = ?', [course_id, department_id]);
+      if (!deptCourse) return res.status(403).json({ error: 'Course does not belong to your department' });
+    }
+
+    // Resolve roll_number -> student_id for each record
+    let imported = 0;
+    let skipped = 0;
+    const errors = [];
+
+    for (const rec of records) {
+      try {
+        let studentId = rec.student_id;
+
+        // Resolve student by roll_number or email if student_id not provided
+        if (!studentId && rec.roll_number) {
+          const student = await dbGet(
+            `SELECT u.id FROM users u JOIN profiles p ON u.id = p.user_id WHERE p.roll_number = ? OR u.email = ?`,
+            [rec.roll_number, rec.roll_number]
+          );
+          if (student) {
+            studentId = student.id;
+          } else {
+            skipped++;
+            errors.push(`Roll/email "${rec.roll_number}" not found — skipped`);
+            continue;
+          }
+        }
+
+        if (!studentId || !rec.date || !rec.status) {
+          skipped++;
+          continue;
+        }
+
+        const validStatuses = ['present', 'absent', 'late'];
+        if (!validStatuses.includes(rec.status.toLowerCase())) {
+          skipped++;
+          continue;
+        }
+
+        // Upsert: insert or update on conflict (course_id, student_id, date)
+        await dbRun(
+          `INSERT INTO attendance (course_id, student_id, date, status)
+           VALUES (?, ?, ?, ?)
+           ON CONFLICT(course_id, student_id, date) DO UPDATE SET status = excluded.status`,
+          [course_id, studentId, rec.date, rec.status.toLowerCase()]
+        );
+        imported++;
+      } catch (recordErr) {
+        skipped++;
+        errors.push(recordErr.message);
+      }
+    }
+
+    res.json({
+      message: `Attendance import complete: ${imported} records saved, ${skipped} skipped.`,
+      imported,
+      skipped,
+      errors: errors.slice(0, 10) // Return first 10 errors only
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Attendance import failed: ' + err.message });
+  }
+});
+
+// ==========================================
+// 10. ANNOUNCEMENTS API
 // ==========================================
 
 // Get Announcements
